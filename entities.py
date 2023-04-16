@@ -2,12 +2,25 @@ import pygame, math
 from utilities import *
         
 class Entity:
-    def __init__(self, position:list, animation:Animation, velocity:list=[0, 0], aceleration:list=[0, 0], location:int=Location.LEFTTOP) -> None:
-        self.position = position
+
+    def __init__(self, physics:list|Physics, animation:Animation, location:int=Location.LEFT_TOP, eventListeners:dict={}) -> None:
+        if isinstance(physics, Physics):
+            self.physics = physics
+        else:
+            self.physics = Physics(physics)
         self.animation = animation
-        self.velocity = velocity
-        self.aceleration = aceleration
         self.location = location
+        self.eventListeners = eventListeners
+
+    def listen_events(self, pressedEventList:list, collisionEventList:list=[]):
+        if EventListener.LISTEN_KEY in self.eventListeners.keys():
+            keyListeners = self.eventListeners[EventListener.LISTEN_KEY]
+            for key, listener in keyListeners.items():
+                listener(entity=self, state=pressedEventList[key])
+        elif EventListener.LISTEN_COLLISION in self.eventListeners.keys():
+            collisionListeners = self.eventListeners[EventListener.LISTEN_COLLISION]
+            for objectType, listener in collisionListeners.items():
+                listener(entity=self, state=collisionEventList[objectType])
 
     def get_frame_limit(self) -> int:
         if self.animation.frameLimit == 0:
@@ -20,7 +33,7 @@ class Entity:
     def limit_frame(self) -> None:
         if self.animation.animationIterationBehavior == AnimationIterationBehavior.INFINITE:
             if self.animation.frame >= self.get_frame_limit():
-                self.animation.frame = 0
+                self.animation.frame = self.animation.startFrame
                 self.animation.animationTime = 0
         elif self.animation.animationIterationBehavior == AnimationIterationBehavior.ONCE:
             if self.animation.frame >= self.get_frame_limit():
@@ -29,7 +42,7 @@ class Entity:
         else:
             if self.animation.animationIterationCount < self.animation.animationIterationLimit:
                 if self.animation.frame >= self.get_frame_limit():
-                    self.animation.frame = 0
+                    self.animation.frame = self.animation.startFrame
                     self.animation.animationTime = 0
                     self.animation.animationIterationCount += 1
             else:
@@ -39,8 +52,12 @@ class Entity:
 
     def change_actual_texture(self, textureName:str) -> None:
         self.animation.actualTexture = textureName
+
+        if self.animation.startFrame >= self.get_frame_limit():
+            self.animation.startFrame = self.get_frame_limit() - 1
+            
         if self.animation.frame >= self.get_frame_limit():
-            self.animation.frame = 0
+            self.animation.frame = self.animation.startFrame
             self.animation.animationTime = 0
 
 
@@ -48,10 +65,10 @@ class Entity:
         return self.animation.textures[self.animation.actualTexture].sprite[self.animation.frame]
 
     def compute_position(self, time:float) -> None:
-        finalVelocity = [self.velocity[0] + self.aceleration[0] * time, self.velocity[1] + self.aceleration[1] * time]
-        self.position = [self.position[0] + (self.velocity[0] + finalVelocity[0]) / 2 * time,
-                         self.position[1] + (self.velocity[1] + finalVelocity[1]) / 2 * time]
-        self.velocity = finalVelocity    
+        finalVelocity = [self.physics.velocity[0] + self.physics.aceleration[0] * time, self.physics.velocity[1] + self.physics.aceleration[1] * time]
+        self.physics.position = [self.physics.position[0] + (self.physics.velocity[0] + finalVelocity[0]) / 2 * time,
+                         self.physics.position[1] + (self.physics.velocity[1] + finalVelocity[1]) / 2 * time]
+        self.physics.velocity = finalVelocity    
 
     def update(self, FPS:int) -> None:
         """Update the textures frames and physics attributes with the give FPS.
@@ -60,38 +77,87 @@ class Entity:
         """
         time = 1 / FPS
         self.animation.animationTime += time
-        self.animation.frame = math.floor(self.animation.animationTime * self.animation.FPS)
-
-        self.limit_frame()
-        
-
+        self.animation.frame = math.floor(self.animation.animationTime * self.animation.FPS) + self.animation.startFrame
+        self.limit_frame()        
         self.compute_position(time)
     
     def get_texture_position(self) -> list:
-        if self.location == Location.LEFTTOP:
-            return self.position
-        elif self.location == Location.CENTERTOP:
-            return [self.position[0] - self.get_texture().get_rect().width / 2, self.position[1]]
-        elif self.location == Location.RIGHTTOP:
-            return [self.position[0] - self.get_texture().get_rect().width, self.position[1]]
-        elif self.location == Location.CENTERRIGHT:
-            return [self.position[0] - self.get_texture().get_rect().width, self.position[1] - self.get_texture().get_rect().height / 2]
-        elif self.location == Location.RIGHTBOTTOM:
-            return [self.position[0] - self.get_texture().get_rect().width, self.position[1] - self.get_texture().get_rect().height]
-        elif self.location == Location.CENTERBOTTOM:
-            return [self.position[0] - self.get_texture().get_rect().width / 2, self.position[1] - self.get_texture().get_rect().height]
-        elif self.location == Location.LEFTBOTTOM:
-            return [self.position[0], self.position[1] - self.get_texture().get_rect().height]
-        elif self.location == Location.CENTERLEFT:
-            return [self.position[0], self.position[1] - self.get_texture().get_rect().height / 2]
+        if self.location == Location.LEFT_TOP:
+            return self.physics.position
+        elif self.location == Location.CENTER_TOP:
+            return [self.physics.position[0] - self.get_texture().get_rect().width / 2, self.physics.position[1]]
+        elif self.location == Location.RIGHT_TOP:
+            return [self.physics.position[0] - self.get_texture().get_rect().width, self.physics.position[1]]
+        elif self.location == Location.CENTER_RIGHT:
+            return [self.physics.position[0] - self.get_texture().get_rect().width, self.physics.position[1] - self.get_texture().get_rect().height / 2]
+        elif self.location == Location.RIGHT_BOTTOM:
+            return [self.physics.position[0] - self.get_texture().get_rect().width, self.physics.position[1] - self.get_texture().get_rect().height]
+        elif self.location == Location.CENTER_BOTTOM:
+            return [self.physics.position[0] - self.get_texture().get_rect().width / 2, self.physics.position[1] - self.get_texture().get_rect().height]
+        elif self.location == Location.LEFT_BOTTOM:
+            return [self.physics.position[0], self.physics.position[1] - self.get_texture().get_rect().height]
+        elif self.location == Location.CENTER_LEFT:
+            return [self.physics.position[0], self.physics.position[1] - self.get_texture().get_rect().height / 2]
         elif self.location == Location.CENTER:
-            return [self.position[0] - self.get_texture().get_rect().width / 2, self.position[1] - self.get_texture().get_rect().height / 2]
+            return [self.physics.position[0] - self.get_texture().get_rect().width / 2, self.physics.position[1] - self.get_texture().get_rect().height / 2]
         else:
-            return self.position
+            return self.physics.position
+
+def walk_to_left(entity:Entity, state:bool):
+    if state:
+        entity.physics.direction = Direction.LEFT
+        entity.physics.velocity[0] = -100
+        entity.change_actual_texture('xflip_Walk')
+    else:
+        if entity.physics.velocity[0] == -100:
+            entity.physics.velocity[0] = 0
+            entity.change_actual_texture('xflip_Idle')
+    
+def walk_to_right(entity:Entity, state:bool):
+    if state:
+        entity.physics.direction = Direction.RIGHT
+        entity.physics.velocity[0] = 100
+        entity.change_actual_texture('Walk')
+    else:
+        if entity.physics.velocity[0] == 100:
+            entity.physics.velocity[0] = 0
+            entity.change_actual_texture('Idle')
+
+def walk_to_up(entity:Entity, state:bool):
+    if state:
+        #entity.direction = Direction.UP
+        entity.physics.velocity[1] = -100
+        if entity.physics.direction == Direction.LEFT:
+            entity.change_actual_texture('xflip_Walk')
+        else:
+            entity.change_actual_texture('Walk')
+    else:
+        if entity.physics.velocity[1] == -100:
+            entity.physics.velocity[1] = 0
+            if entity.physics.direction == Direction.LEFT:
+                entity.change_actual_texture('xflip_Idle')
+            else:
+                entity.change_actual_texture('Idle')
+    
+def walk_to_down(entity:Entity, state:bool):
+    if state:
+        #entity.direction = Direction.DOWN
+        entity.physics.velocity[1] = 100
+        if entity.physics.direction == Direction.LEFT:
+            entity.change_actual_texture('xflip_Walk')
+        else:
+            entity.change_actual_texture('Walk')
+    else:
+        if entity.physics.velocity[1] == 100:
+            entity.physics.velocity[1] = 0
+            if entity.physics.direction == Direction.LEFT:
+                entity.change_actual_texture('xflip_Idle')
+            else:
+                entity.change_actual_texture('Idle')
         
 class Background(Entity):
-    def __init__(self, position, animation:Animation, displaySize, scalar=1.5, velocity=[0, 0], aceleration=[0, 0], location=Location.LEFTTOP):
-        super().__init__(position, animation, velocity, aceleration, location)
+    def __init__(self, physics:list|Physics, animation:Animation, displaySize, scalar=1.5, location=Location.LEFT_TOP, eventListeners:dict={}):
+        super().__init__(physics, animation, location, eventListeners=eventListeners)
 
         self.displaySize = displaySize
  
@@ -105,14 +171,65 @@ class Background(Entity):
                 else:
                     textureScalar = displaySize[0] * scalar / self.animation.textures[key].sprite[index].get_rect().width
                 self.animation.textures[key].sprite[index] = pygame.transform.scale_by(self.animation.textures[key].sprite[index], textureScalar)
+    
+    def get_texture(self) -> pygame.Surface:
+        finalTexture = pygame.Surface(self.animation.textures[self.animation.actualTexture].sprite[self.animation.frame].get_size())
+        imageFrame = self.animation.textures[self.animation.actualTexture].sprite[self.animation.frame]
+        width = imageFrame.get_width()
+        height = imageFrame.get_height()
+        x, y = self.physics.position
+        if self.physics.position[0] > 0:
+            self.physics.position[0] -= width
+        elif self.physics.position[0] < -width:
+            self.physics.position[0] += width
+
+        if self.physics.position[1] > 0:
+            self.physics.position[1] -= height
+        elif self.physics.position[1] < -height:
+            self.physics.position[1] += height
+        
+        finalTexture.blit(imageFrame, (x, y))
+        finalTexture.blit(imageFrame,  (x + width, y))
+        finalTexture.blit(imageFrame,  (x, y + height))
+        finalTexture.blit(imageFrame,  (x + width, y + height))
+
+        return finalTexture
+    
+    def get_texture_position(self) -> list:
+        if self.location == Location.LEFT_TOP:
+            return 0, 0
+        elif self.location == Location.CENTER_TOP:
+            return [-self.get_texture().get_rect().width / 2, 0]
+        elif self.location == Location.RIGHT_TOP:
+            return [-self.get_texture().get_rect().width, 0]
+        elif self.location == Location.CENTER_RIGHT:
+            return [-self.get_texture().get_rect().width, -self.get_texture().get_rect().height / 2]
+        elif self.location == Location.RIGHT_BOTTOM:
+            return [-self.get_texture().get_rect().width, -self.get_texture().get_rect().height]
+        elif self.location == Location.CENTER_BOTTOM:
+            return [-self.get_texture().get_rect().width / 2, -self.get_texture().get_rect().height]
+        elif self.location == Location.LEFT_BOTTOM:
+            return [0, -self.get_texture().get_rect().height]
+        elif self.location == Location.CENTER_LEFT:
+            return [0, -self.get_texture().get_rect().height / 2]
+        elif self.location == Location.CENTER:
+            return [-self.get_texture().get_rect().width / 2, -self.get_texture().get_rect().height / 2]
+        else:
+            return 0,0
+
+
+
+basicCharacterBehaviour = {EventListener.LISTEN_KEY: {pygame.K_LEFT: walk_to_left, pygame.K_RIGHT: walk_to_right, pygame.K_UP: walk_to_up, pygame.K_DOWN: walk_to_down}}
 
 class MainCharacter(Entity):
-    def __init__(self, position:list, animation:Animation, velocity=[0, 0], aceleration=[0, 0], location=Location.CENTERBOTTOM):
-        super().__init__(position, animation, velocity, aceleration, location)
+    def __init__(self, physics:list|Physics, animation:Animation, location=Location.CENTER_BOTTOM, eventListeners:dict=basicCharacterBehaviour):
+        super().__init__(physics, animation, location, eventListeners=eventListeners)
+
+        
 
 class LevelWorksSpace(Entity):
-    def __init__(self, background:Background, mainCharacter:MainCharacter,  position=[0, 0], animation=Animation(), velocity=[0, 0], aceleration=[0, 0], location=Location.LEFTTOP):
-        super().__init__(position, animation, velocity, aceleration, location)
+    def __init__(self, background:Background, mainCharacter:MainCharacter,  physics:list|Physics=Physics([0, 0]), animation=Animation(), location=Location.LEFT_TOP, eventListeners:dict={}):
+        super().__init__(physics, animation, location, eventListeners=eventListeners)
         self.background = background
         self.mainCharacter = mainCharacter
     
@@ -120,24 +237,25 @@ class LevelWorksSpace(Entity):
         """Compute the works space position to try centrate de main character."""
 
         # computing axis x position offset
-        if self.mainCharacter.position[0] <= self.background.displaySize[0] / 2:
-            self.position[0] = 0
+        if self.mainCharacter.physics.position[0] <= self.background.displaySize[0] / 2:
+            self.physics.position[0] = 0
 
-        elif self.mainCharacter.position[0] >= self.background.get_texture().get_rect().width - self.background.displaySize[0] / 2:
-            self.position[0] = -1 * (self.background.get_texture().get_rect().width - self.background.displaySize[0])
+        elif self.mainCharacter.physics.position[0] >= self.background.get_texture().get_rect().width - self.background.displaySize[0] / 2:
+            self.physics.position[0] = -1 * (self.background.get_texture().get_rect().width - self.background.displaySize[0])
 
         else:
-            self.position[0] = -1 * (self.mainCharacter.position[0] - self.background.displaySize[0] / 2)
+            self.physics.position[0] = -1 * (self.mainCharacter.physics.position[0] - self.background.displaySize[0] / 2)
 
         # computing axis y position offset 
-        if self.mainCharacter.position[1] <= self.background.displaySize[1] / 2:
-            self.position[1] = 0
+        if self.mainCharacter.physics.position[1] <= self.background.displaySize[1] / 2:
+            self.physics.position[1] = 0
 
-        elif self.mainCharacter.position[1] >= self.background.get_texture().get_rect().height - self.background.displaySize[1] / 2:
-            self.position[1] = -1 * (self.background.get_texture().get_rect().height - self.background.displaySize[1])
+        elif self.mainCharacter.physics.position[1] >= self.background.get_texture().get_rect().height - self.background.displaySize[1] / 2:
+            self.physics.position[1] = -1 * (self.background.get_texture().get_rect().height - self.background.displaySize[1])
 
         else:
-            self.position[1] = -1 * (self.mainCharacter.position[1] - self.background.displaySize[1] / 2)
+            self.physics.position[1] = -1 * (self.mainCharacter.physics.position[1] - self.background.displaySize[1] / 2)
+            print('e3')
     
     def update(self, FPS:int) -> None:        
 
@@ -149,5 +267,10 @@ class LevelWorksSpace(Entity):
         self.compute_position()
     
     def fitThePosition(self, position:list) -> list:
-        return self.position[0] + position[0], self.position[1] + position[1]
+        return self.physics.position[0] + position[0], self.physics.position[1] + position[1]
+    
+    def listen_events(self, keyPressedList):
+        self.mainCharacter.listen_events(keyPressedList)
+        self.background.listen_events(keyPressedList)
+    
  
