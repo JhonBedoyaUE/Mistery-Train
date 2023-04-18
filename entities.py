@@ -48,36 +48,44 @@ class Entity:
         else:
             return self.physics.position
 
+    def get_max_y_texture_position(self) -> list:
+        if self.location == Location.LEFT_TOP or self.location == Location.CENTER_TOP or self.location == Location.RIGHT_TOP:
+            return self.physics.position[1] + self.animation.get_texture().get_rect().height
+        elif self.location == Location.CENTER_RIGHT or self.location == Location.CENTER_LEFT or self.location == Location.CENTER:
+            return self.physics.position[1] + self.animation.get_texture().get_rect().height / 2
+        else:
+            return self.physics.position[1]
+
 def walk_to_left(entity:Entity, state:bool):
     if state:
         entity.physics.direction = Direction.LEFT
-        entity.physics.velocity[0] = -100
+        entity.physics.velocity[0] = -200
         entity.animation.change_actual_texture('xflip_Walk')
     else:
-        if entity.physics.velocity[0] == -100:
+        if entity.physics.velocity[0] == -200:
             entity.physics.velocity[0] = 0
             entity.animation.change_actual_texture('xflip_Idle')
     
 def walk_to_right(entity:Entity, state:bool):
     if state:
         entity.physics.direction = Direction.RIGHT
-        entity.physics.velocity[0] = 100
+        entity.physics.velocity[0] = 200
         entity.animation.change_actual_texture('Walk')
     else:
-        if entity.physics.velocity[0] == 100:
+        if entity.physics.velocity[0] == 200:
             entity.physics.velocity[0] = 0
             entity.animation.change_actual_texture('Idle')
 
 def walk_to_up(entity:Entity, state:bool):
     if state:
         #entity.direction = Direction.UP
-        entity.physics.velocity[1] = -100
+        entity.physics.velocity[1] = -200
         if entity.physics.direction == Direction.LEFT:
             entity.animation.change_actual_texture('xflip_Walk')
         else:
             entity.animation.change_actual_texture('Walk')
     else:
-        if entity.physics.velocity[1] == -100:
+        if entity.physics.velocity[1] == -200:
             entity.physics.velocity[1] = 0
             if entity.physics.direction == Direction.LEFT:
                 entity.animation.change_actual_texture('xflip_Idle')
@@ -87,13 +95,13 @@ def walk_to_up(entity:Entity, state:bool):
 def walk_to_down(entity:Entity, state:bool):
     if state:
         #entity.direction = Direction.DOWN
-        entity.physics.velocity[1] = 100
+        entity.physics.velocity[1] = 200
         if entity.physics.direction == Direction.LEFT:
             entity.animation.change_actual_texture('xflip_Walk')
         else:
             entity.animation.change_actual_texture('Walk')
     else:
-        if entity.physics.velocity[1] == 100:
+        if entity.physics.velocity[1] == 200:
             entity.physics.velocity[1] = 0
             if entity.physics.direction == Direction.LEFT:
                 entity.animation.change_actual_texture('xflip_Idle')
@@ -162,6 +170,8 @@ class Background(Entity):
             return [-self.animation.get_texture().get_rect().width / 2, -self.animation.get_texture().get_rect().height / 2]
         else:
             return 0,0
+        
+
 
 
 
@@ -192,11 +202,32 @@ def quick_backgrounds_sort(backgroundsList:list):
     else:
         return backgroundsList    
 
+def quick_entities_sort(entitiesList:list):
+    if 0 < len(entitiesList) - 1:
+        pivot = entitiesList[:1]
+        left = []
+        right = []
+        
+        for element in entitiesList[1:]:
+            if pivot[0].get_max_y_texture_position() > element.get_max_y_texture_position():
+                left.append(element)
+            else:
+                right.append(element)
+                
+        left = quick_backgrounds_sort(left)
+        right = quick_backgrounds_sort(right)
+        
+        return left + pivot + right
+        
+    else:
+        return entitiesList    
+
 class LevelWorksSpace(Entity):
-    def __init__(self, levelSize:tuple, background:Background|list, mainCharacter:MainCharacter, displaySize:tuple, physics:list|Physics=Physics([0, 0]), animation=Animation(), location=Location.LEFT_TOP, eventListeners:dict={}, backgroundColor:tuple=(0,0,255)) -> None:
+    def __init__(self, levelSize:tuple, background:Background|list, mainCharacter:MainCharacter, displaySize:tuple, entitiesList:Entity|list=[], physics:list|Physics=Physics([0, 0]), animation=Animation(), location=Location.LEFT_TOP, eventListeners:dict={}, backgroundColor:tuple=(0,0,255)) -> None:
         super().__init__(physics, animation, location, eventListeners=eventListeners)
 
-        self.isBackgroundsOrdered = False
+        self.areBackgroundsSorted = False
+        self.areEntitiesSorted = False
         self.mainCharacter = mainCharacter
         self.displaySize = displaySize
         self.levelSize =levelSize
@@ -207,14 +238,28 @@ class LevelWorksSpace(Entity):
             self.backgroundList = [background]
         else:
             self.backgroundList = background
+
+        if isinstance(entitiesList, Entity):
+            self.entitiesList = [entitiesList]
+        else:
+            self.entitiesList = entitiesList
         
         self.update_backgrounds()
 
+    def update_entities(self, FPS:int=0) -> None:
+        if not self.areEntitiesSorted:
+            self.entitiesList = quick_backgrounds_sort(self.entitiesList)
+            self.areEntitiesSorted = True
+            print([entity.get_max_y_texture_position() for entity in self.entitiesList])
+        if FPS > 0:
+            for entityIndex in range(len(self.entitiesList)):
+                self.entitiesList[entityIndex].update(FPS)
+
     
     def update_backgrounds(self, FPS:int=0) -> None:
-        if not self.isBackgroundsOrdered:
+        if not self.areBackgroundsSorted:
             self.backgroundList = quick_backgrounds_sort(self.backgroundList)
-            self.isBackgroundsOrdered = True
+            self.areBackgroundsSorted = True
         if FPS > 0:
             self.background.fill(self.backgroundColor)
             for backgroundIndex in range(len(self.backgroundList)):
@@ -249,6 +294,7 @@ class LevelWorksSpace(Entity):
 
         self.mainCharacter.update(FPS)
         self.update_backgrounds(FPS=FPS)
+        self.update_entities(FPS=FPS)
         self.update_works_space_position()
     
     def fitThePosition(self, position:list) -> list:
@@ -261,6 +307,14 @@ class LevelWorksSpace(Entity):
 
     def show(self, display:pygame.Surface) -> None:
         display.blit(self.background, (0,0))
-        display.blit(self.mainCharacter.animation.get_texture(), self.fitThePosition(self.mainCharacter.get_texture_position()))
+        isMainCharacterShowed = False
+        for entity in self.entitiesList:
+            if not isMainCharacterShowed and entity.get_max_y_texture_position() > self.mainCharacter.get_max_y_texture_position():
+                display.blit(self.mainCharacter.animation.get_texture(), self.fitThePosition(self.mainCharacter.get_texture_position()))
+                isMainCharacterShowed = True
+            display.blit(entity.animation.get_texture(), self.fitThePosition(entity.get_texture_position()))
+        if not isMainCharacterShowed:
+            display.blit(self.mainCharacter.animation.get_texture(), self.fitThePosition(self.mainCharacter.get_texture_position()))
+        
     
  

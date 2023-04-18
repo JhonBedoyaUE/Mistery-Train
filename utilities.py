@@ -68,23 +68,44 @@ def extract_content(surface:pygame.Surface, extract) -> pygame.Rect:
         return surface
 
 class Transformation:
-    def IDENTITY(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False) -> dict:
-        scalledSprite = [extract_content(pygame.transform.scale_by(frame, scalar), extractContent) for frame in sprite.sprite]
+    def IDENTITY(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+        scalledSprite = [] 
+        for frame in sprite.sprite:
+            textureScalar = scalar
+            if scalarBase != (0, 0):
+                textureAspectRatio = frame.get_rect().height / frame.get_rect().width
+                displayAspectRatio = scalarBase[1] / scalarBase[0]
+                if textureAspectRatio <= displayAspectRatio:
+                    textureScalar = scalarBase[1] * scalar / frame.get_rect().height
+                else:
+                    textureScalar = scalarBase[0] * scalar / frame.get_rect().width
+            
+            scalledSprite.append(extract_content(pygame.transform.scale_by(frame, textureScalar), extractContent))
         return {'sprite': Texture(scalledSprite), 'name': name}
 
-    def XFLIP(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False) -> dict:
-        flippedSprite = [extract_content(pygame.transform.scale_by(pygame.transform.flip(frame, flip_x=(variationIndex != 0), flip_y=False), scalar), extractContent) for frame in sprite.sprite]
+    def XFLIP(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+        flippedSprite = []
+        for frame in sprite.sprite:
+            textureScalar = scalar
+            if scalarBase != (0, 0):
+                textureAspectRatio = frame.get_rect().height / frame.get_rect().width
+                displayAspectRatio = scalarBase[1] / scalarBase[0]
+                if textureAspectRatio <= displayAspectRatio:
+                    textureScalar = scalarBase[1] * scalar / frame.get_rect().height
+                else:
+                    textureScalar = scalarBase[0] * scalar / frame.get_rect().width
+            flippedSprite.append(extract_content(pygame.transform.scale_by(pygame.transform.flip(frame, flip_x=(variationIndex != 0), flip_y=False), textureScalar), extractContent))
         return {'sprite': Texture(flippedSprite), 'name': ('xflip_'*(variationIndex != 0))+name}
 
 
         
-def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/', variations:int=1, transformFunction:types.FunctionType=Transformation.IDENTITY, scalar:float=1, extractContent:bool=False) -> dict:
+def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/', variations:int=1, transformFunction:types.FunctionType=Transformation.IDENTITY, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
     textures = {'default': Texture(pygame.Surface((500, 500)), 1)}
     for index in range(len(fileNameList)):
         sprite = pygame.image.load(path + fileNameList[index]).convert_alpha()
         for variationIndex in range(variations):
             texture = Texture(sprite, spriteLeghtList[index])
-            textureVariation = transformFunction(texture, variationIndex, fileNameList[index].split('.')[0], scalar, extractContent)
+            textureVariation = transformFunction(texture, variationIndex, fileNameList[index].split('.')[0], scalar, extractContent, scalarBase=scalarBase)
             textures[textureVariation['name']] = textureVariation['sprite']
     return textures
 
