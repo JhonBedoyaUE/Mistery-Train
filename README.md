@@ -1,4 +1,4 @@
-# Mistery Train
+# Mystery Train
 Este es nuestro proyecto de programacion para el primer semestre de Ciencia De Datos.
 ## Partes
 ### main.py
