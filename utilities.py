@@ -67,8 +67,21 @@ def extract_content(surface:pygame.Surface, extract) -> pygame.Rect:
     else:
         return surface
 
+def invert_colors(surface:pygame.Surface, invert:bool) -> pygame.Rect:
+    if invert:
+        invertedSurface = surface.copy()
+        for x in range(surface.get_width()):
+            for y in range(surface.get_height()):
+                color = surface.get_at((x,y))
+                invertedColor = 255 - color[0], 255 - color[1], 255 - color[2], color[3]
+                invertedSurface.set_at((x,y), invertedColor)
+        return invertedSurface
+    else:
+        return surface
+
+
 class Transformation:
-    def IDENTITY(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+    def BASIC(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
         scalledSprite = [] 
         for frame in sprite.sprite:
             textureScalar = scalar
@@ -96,10 +109,25 @@ class Transformation:
                     textureScalar = scalarBase[0] * scalar / frame.get_rect().width
             flippedSprite.append(extract_content(pygame.transform.scale_by(pygame.transform.flip(frame, flip_x=(variationIndex != 0), flip_y=False), textureScalar), extractContent))
         return {'sprite': Texture(flippedSprite), 'name': ('xflip_'*(variationIndex != 0))+name}
+    
+    
+    def NEGATIVE_COLOR(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+        negativeSprite = []
+        for frame in sprite.sprite:
+            textureScalar = scalar
+            if scalarBase != (0, 0):
+                textureAspectRatio = frame.get_rect().height / frame.get_rect().width
+                displayAspectRatio = scalarBase[1] / scalarBase[0]
+                if textureAspectRatio <= displayAspectRatio:
+                    textureScalar = scalarBase[1] * scalar / frame.get_rect().height
+                else:
+                    textureScalar = scalarBase[0] * scalar / frame.get_rect().width
+            negativeSprite.append(invert_colors(extract_content(pygame.transform.scale_by(frame, textureScalar), extractContent), (variationIndex != 0)))
+        return {'sprite': Texture(negativeSprite), 'name': ('negative_'*(variationIndex != 0))+name}
 
 
         
-def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/', variations:int=1, transformFunction:types.FunctionType=Transformation.IDENTITY, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/', variations:int=1, transformFunction:types.FunctionType=Transformation.BASIC, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
     textures = {'default': Texture(pygame.Surface((500, 500)), 1)}
     for index in range(len(fileNameList)):
         sprite = pygame.image.load(path + fileNameList[index]).convert_alpha()
@@ -109,7 +137,14 @@ def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/
             textures[textureVariation['name']] = textureVariation['sprite']
     return textures
 
-def create_hitbox(dimentions:pygame.Rect, margin:list) -> pygame.Rect:
+def create_empty_texture(width:int, height:int, name:str='default', scalar:float=1, scalarBase:tuple=(0,0)):
+    emptySprite = pygame.Surface((width, height))
+    emptySprite.set_alpha(0)
+    textureVariation = Transformation.BASIC(Texture(emptySprite, 1), None, name, scalar=scalar, scalarBase=scalarBase)
+    return {name: textureVariation['sprite']}
+
+def create_hitbox(dimentions:pygame.Rect, margin:list, hitboxSize:list[int], hitboxLocation:int) -> pygame.Rect:
+        hitbox = hitbox = pygame.Rect(dimentions.left, dimentions.top, hitboxSize[0], hitboxSize[1])
         if len(margin) == 1:
             left = margin[0]
             top = margin[0]
@@ -125,11 +160,32 @@ def create_hitbox(dimentions:pygame.Rect, margin:list) -> pygame.Rect:
             top = margin[1]
             right = margin[2]
             bottom = margin[3]
-        
-        return pygame.Rect(dimentions.left - left, dimentions.top - top, dimentions.size[0] + left + right, dimentions.size[1] + top + bottom)
+        if hitboxSize == [0, 0]:
+            hitbox = pygame.Rect(dimentions.left - left, dimentions.top - top, dimentions.size[0] + left + right, dimentions.size[1] + top + bottom)
+        else:
+            if hitboxLocation == Location.LEFT_TOP:
+                hitbox = pygame.Rect(left+dimentions.left, right+dimentions.top, hitboxSize[0], hitboxSize[1])
+            elif hitboxLocation == Location.CENTER_TOP:
+                hitbox = pygame.Rect(left+dimentions.left + dimentions.width / 2 - hitboxSize[0] / 2, right+dimentions.top, hitboxSize[0], hitboxSize[1])
+            elif hitboxLocation == Location.RIGHT_TOP:
+                hitbox = pygame.Rect(left+dimentions.left + dimentions.width - hitboxSize[0], right+dimentions.top, hitboxSize[0], hitboxSize[1])
+            elif hitboxLocation == Location.CENTER_RIGHT:
+                hitbox = pygame.Rect(left+dimentions.left + dimentions.width - hitboxSize[0], right+dimentions.top + dimentions.height / 2 - hitboxSize[1] / 2, hitboxSize[0], hitboxSize[1])
+            elif hitboxLocation == Location.RIGHT_BOTTOM:
+                hitbox = pygame.Rect(left+dimentions.left + dimentions.width - hitboxSize[0], right+dimentions.top + dimentions.height - hitboxSize[1], hitboxSize[0], hitboxSize[1])
+            elif hitboxLocation == Location.CENTER_BOTTOM:
+                hitbox = pygame.Rect(left+dimentions.left + dimentions.width / 2 - hitboxSize[0] / 2, right+dimentions.top + dimentions.height - hitboxSize[1], hitboxSize[0], hitboxSize[1])
+            elif hitboxLocation == Location.LEFT_BOTTOM:
+                hitbox = pygame.Rect(left+dimentions.left, right+dimentions.top + dimentions.height - hitboxSize[1], hitboxSize[0], hitboxSize[1])
+            elif hitboxLocation == Location.CENTER_LEFT:
+                hitbox = pygame.Rect(left+dimentions.left, right+dimentions.top + dimentions.height / 2 - hitboxSize[1] / 2, hitboxSize[0], hitboxSize[1])
+            else:
+                hitbox = pygame.Rect(left+dimentions.left + dimentions.width / 2 - hitboxSize[0] / 2, right+dimentions.top + dimentions.height / 2 - hitboxSize[1] / 2, hitboxSize[0], hitboxSize[1])
+
+        return hitbox
 
 class Animation:
-    def __init__(self, textures:dict=create_textures([], []), actualTexture:str='default', zIndex:int=0, frame:int=0, startFrame:int = 0, frameLimit:int=0, FPS:int=10, animationTime:int=0, animationIterationBehavior:int=AnimationIterationBehavior.INFINITE, animationIterationLimit:int=1, animationIterationCount:int=0) -> None:
+    def __init__(self, textures:dict=create_textures([], []), actualTexture:str='default', zIndex:int=0, frame:int=0, startFrame:int = 0, frameLimit:int=0, FPS:int=10, animationTime:int=0, animationIterationBehavior:int=AnimationIterationBehavior.INFINITE, animationIterationLimit:int=1, animationIterationCount:int=0, isAnimated:bool=True) -> None:
         self.textures = textures
         self.actualTexture = actualTexture
         self.zIndex = zIndex
@@ -141,12 +197,14 @@ class Animation:
         self.animationIterationCount = animationIterationCount
         self.animationIterationLimit = animationIterationLimit
         self.startFrame = startFrame
+        self.isAnimated = isAnimated
     
     def update_frame(self, FPS:int):
-        time = 1 / FPS
-        self.animationTime += time
-        self.frame = math.floor(self.animationTime * self.FPS) + self.startFrame
-        self.limit_frame()  
+        if self.isAnimated:
+            time = 1 / FPS
+            self.animationTime += time
+            self.frame = math.floor(self.animationTime * self.FPS) + self.startFrame
+            self.limit_frame()  
     
     def get_frame_limit(self) -> int:
         if self.frameLimit == 0:
@@ -190,28 +248,49 @@ class Animation:
     def get_texture(self) -> pygame.Surface:
         return self.textures[self.actualTexture].sprite[self.frame]
 
+
 class Physics:
-    def __init__(self, position:list, velocity:list=[0, 0], aceleration:list=[0, 0], direction:int=Direction.LEFT, limitRestrictions:bool=False, hitRestrictions:bool=False, dimentions:pygame.Rect=pygame.Rect(0,0,0,0), margin:list=[0]) -> None:
+    def __init__(self, position:list, velocity:list=[0, 0], aceleration:list=[0, 0], direction:int=Direction.LEFT, limitRestrictions:bool=False, isCollidable:bool=False, dimentions:pygame.Rect=pygame.Rect(0,0,0,0), margin:list=[0], hitboxSize:list[int]=[0,0], hitboxLocation:int=Location.CENTER_BOTTOM, isUpdatable:bool=True) -> None:
         self.position = position 
+        self.previousPosition = self.position.copy()
         self.velocity = velocity
         self.aceleration = aceleration
         self.direction = direction
         self.limitRestrictions = limitRestrictions
-        self.hitRestrictions = hitRestrictions
+        self.isCollidable = isCollidable
         self.margin = margin
-        self.hitbox  = create_hitbox(dimentions, margin)
+        self.hitbox  = create_hitbox(dimentions, margin, hitboxSize, hitboxLocation)
+        self.previousHitbox = self.hitbox.copy()
+        self.hitboxColor = 0,0,255
+        self.isPositionChanged = False
+        self.isUpdatable = isUpdatable
+        self.hitboxSize = hitboxSize
+        self. hitboxLocation =  hitboxLocation
+
     
-    def update_hitbox(self, dimentions:pygame.Rect, margin:list=None):
+    def update_hitbox(self, dimentions:pygame.Rect, margin:list[int]=None, hitboxSize:list[int]=None,  hitboxLocation:int=None):
+        self.previousHitbox = self.hitbox.copy()
         if isinstance(margin, list):
             self.margin = margin
-        self.hitbox = create_hitbox(dimentions, self.margin)
+        if isinstance(hitboxSize, list):
+            self.hitboxSize = hitboxSize
+        if isinstance(hitboxLocation, int):
+            self.hitboxLocation = hitboxLocation
+        self.hitbox = create_hitbox(dimentions, self.margin, self.hitboxSize, self.hitboxLocation)
 
     def update_position(self, FPS:int) -> None:
-        time = 1 / FPS
-        finalVelocity = [self.velocity[0] + self.aceleration[0] * time, self.velocity[1] + self.aceleration[1] * time]
-        self.position = [self.position[0] + (self.velocity[0] + finalVelocity[0]) / 2 * time,
-                         self.position[1] + (self.velocity[1] + finalVelocity[1]) / 2 * time]
-        self.velocity = finalVelocity 
+        if self.isUpdatable:
+            self.previousPosition = self.position.copy()
+            time = 1 / FPS
+            finalVelocity = [self.velocity[0] + self.aceleration[0] * time, self.velocity[1] + self.aceleration[1] * time]
+            self.position = [self.position[0] + (self.velocity[0] + finalVelocity[0]) / 2 * time,
+                            self.position[1] + (self.velocity[1] + finalVelocity[1]) / 2 * time]
+            self.velocity = finalVelocity 
+
+            if self.previousPosition == self.position:
+                self.isPositionChanged = False
+            else:
+                self.isPositionChanged = True
 
 class EventListener:
     pass
