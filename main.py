@@ -4,7 +4,7 @@ import levels.levelExample as template
 #Importante: Para no saturar el archivo principal los niveles deben crearse como archivos .py en la carpeta /levels
 # En el archivo del nivel debe existir una funcion llamada create_level() que retornara el LevelWorsSpace del nivel 
 # Ademas los modulos deben estar en la carpeta /game_modules para mantener en orden los archivos del juego
-# Aún falta integracion con el mouse, textos o menus contextuales
+# Aún falta textos o menus contextuales
 
 pygame.init()
 
