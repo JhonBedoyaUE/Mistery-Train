@@ -1,9 +1,9 @@
 import pygame, math
-from utilities import *
+from game_modules.utilities import *
         
 class Entity:
 
-    def __init__(self, physics:list|Physics, animation:Animation, location:int=Location.LEFT_TOP, eventListeners:dict={}, collideListeners:dict={}) -> None:
+    def __init__(self, physics:list|Physics, animation:Animation, location:int=Location.LEFT_TOP, entity_id:int|str=None, eventListeners:dict={}, collideListeners:dict={}, behaviour:types.FunctionType=lambda selfEntity:None) -> None:
         """Initialize the object .
 
         Args:
@@ -25,6 +25,8 @@ class Entity:
         self.entity_id = None
         self.parent = None
         self.type = None
+        self.time= 0
+        self.behaviour = behaviour
     
     def listen_collide(self, collidedEntity):
         if collidedEntity.type in self.collideListeners.keys():
@@ -34,17 +36,17 @@ class Entity:
         for key, listener in self.eventListeners.items():
             listener(entity=self, state=pressedEventList[key])  
 
-    def update(self, FPS:int) -> None:
+    def update(self, FPS:int, firstInit:bool=False) -> None:
         """Update the animation .
 
         Args:
             FPS (int): [description]
         """
-
-
-        
-        self.animation.update_frame(FPS)      
-        self.physics.update_position(FPS)
+        if not firstInit:    
+            self.time+=1/FPS
+            self.behaviour(self)
+            self.animation.update_frame(FPS)      
+            self.physics.update_position(FPS)
         self.physics.update_hitbox(pygame.Rect(self.get_texture_position(), self.animation.get_texture().get_size()))
     
     def get_texture_position(self) -> list:
@@ -159,7 +161,7 @@ def walk_to_down(entity:Entity, state:bool) -> None:
         
 class Background(Entity):
 
-    def __init__(self, physics:list|Physics, animation:Animation, displaySize:tuple, scalar=1.5, location=Location.LEFT_TOP, eventListeners:dict={}):
+    def __init__(self, physics:list|Physics, animation:Animation, displaySize:tuple, scalar=1.5, location=Location.LEFT_TOP, entity_id:int|str=0, eventListeners:dict={},behaviour:types.FunctionType=lambda selfEntity:None):
         """Initialize the animation .
 
         Args:
@@ -170,7 +172,7 @@ class Background(Entity):
             location ([type], optional): [description]. Defaults to Location.LEFT_TOP.
             eventListeners (dict, optional): [description]. Defaults to {}.
         """
-        super().__init__(physics, animation, location, eventListeners=eventListeners)
+        super().__init__(physics, animation, location, entity_id=entity_id, eventListeners=eventListeners, behaviour=behaviour)
         self.type = 'Background'
 
         self.displaySize = displaySize
@@ -222,7 +224,9 @@ class Background(Entity):
         elif self.location == Location.RIGHT_BOTTOM:
             return [-self.animation.get_texture().get_rect().width, -self.animation.get_texture().get_rect().height]
         elif self.location == Location.CENTER_BOTTOM:
+
             return [-self.animation.get_texture().get_rect().width / 2, -self.animation.get_texture().get_rect().height]
+        
         elif self.location == Location.LEFT_BOTTOM:
             return [0, -self.animation.get_texture().get_rect().height]
         elif self.location == Location.CENTER_LEFT:
@@ -239,9 +243,10 @@ class Background(Entity):
 basicCharacterBehaviour = {pygame.K_LEFT: walk_to_left, pygame.K_RIGHT: walk_to_right, pygame.K_UP: walk_to_up, pygame.K_DOWN: walk_to_down}
 
 class MainCharacter(Entity):
-    def __init__(self, physics:list|Physics, animation:Animation, location=Location.CENTER_BOTTOM, eventListeners:dict=basicCharacterBehaviour, collideListeners:dict={}):
-        super().__init__(physics, animation, location, eventListeners=eventListeners, collideListeners=collideListeners)
+    def __init__(self, physics:list|Physics, animation:Animation, location=Location.CENTER_BOTTOM, entity_id:int|str=0, eventListeners:dict=basicCharacterBehaviour, collideListeners:dict={},behaviour:types.FunctionType=lambda selfEntity:None):
+        super().__init__(physics, animation, location, entity_id=entity_id, eventListeners=eventListeners, collideListeners=collideListeners, behaviour=behaviour)
         self.type = "MainCharacter"
+        self.physics.positionColor = 255, 0, 100
 
 
 def quick_backgrounds_sort(backgroundsList:list):
@@ -297,56 +302,56 @@ def collide_and_limit(listeningEntity:Entity, entitiesList:list[Entity], changeC
                     horizontal = listeningEntity.physics.position[0] - listeningEntity.physics.previousPosition[0]
                     vertical = listeningEntity.physics.position[1] - listeningEntity.physics.previousPosition[1]
 
-                    if listeningEntity.physics.isPositionChanged:
-                        if horizontal > 0:
-                            pending = vertical / horizontal
-                            newYPositionByX = (entity.physics.hitbox.left - listeningEntity.physics.hitbox.width) * pending + (listeningEntity.physics.hitbox.top - listeningEntity.physics.hitbox.left * pending)
+                    
+                    if horizontal > 0:
+                        pending = vertical / horizontal
+                        newYPositionByX = (entity.physics.hitbox.left - listeningEntity.physics.hitbox.width) * pending + (listeningEntity.physics.hitbox.top - listeningEntity.physics.hitbox.left * pending)
 
-                            if newYPositionByX + listeningEntity.physics.hitbox.height < entity.physics.hitbox.top or newYPositionByX > entity.physics.hitbox.top + entity.physics.hitbox.height:
-                                #The movement must be returned on y axis
-                                if vertical > 0: 
-                                    #The movement must be returned to up  
-                                    #print('up', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ')             
-                                    listeningEntity.physics.position = [listeningEntity.physics.position[0],  listeningEntity.physics.position[1] + (entity.physics.hitbox.top - listeningEntity.physics.hitbox.height) - listeningEntity.physics.hitbox.top]
-                                else:
-                                    #Te movement must be returned to down
-                                    #print('down', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ')
-                                    listeningEntity.physics.position = [listeningEntity.physics.position[0],  listeningEntity.physics.position[1] + (entity.physics.hitbox.top + entity.physics.hitbox.height) - listeningEntity.physics.hitbox.top]
-                            else:
-                                #The movement must be returned to left
-                                #print('left', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ') 
-                                listeningEntity.physics.position = [listeningEntity.physics.position[0] + (entity.physics.hitbox.left - listeningEntity.physics.hitbox.width) - listeningEntity.physics.hitbox.left, listeningEntity.physics.position[1]]
-                        elif horizontal < 0:
-                            pending = vertical / horizontal
-                            newYPositionByX = (entity.physics.hitbox.left + entity.physics.hitbox.width) * pending + (listeningEntity.physics.hitbox.top - listeningEntity.physics.hitbox.left * pending)
-
-
-                            if newYPositionByX + listeningEntity.physics.hitbox.height < entity.physics.hitbox.top or newYPositionByX > entity.physics.hitbox.top + entity.physics.hitbox.height:
-                                #The movement must be returned on y axis
-                                if vertical > 0:  
-                                    #The movement must be returned to up
-                                    #print('up', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ')             
-                                    listeningEntity.physics.position = [listeningEntity.physics.position[0],  listeningEntity.physics.position[1] + (entity.physics.hitbox.top - listeningEntity.physics.hitbox.height) - listeningEntity.physics.hitbox.top]
-                                else:
-                                    #Te movement must be returned to down
-                                    #print('down', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ')
-                                    listeningEntity.physics.position = [listeningEntity.physics.position[0],  listeningEntity.physics.position[1] + (entity.physics.hitbox.top + entity.physics.hitbox.height) - listeningEntity.physics.hitbox.top]
-                            else:
-                                #The movement must be returned to right
-                                #print('right', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ') 
-                                listeningEntity.physics.position = [listeningEntity.physics.position[0] + (entity.physics.hitbox.left + entity.physics.hitbox.width) - listeningEntity.physics.hitbox.left, listeningEntity.physics.position[1]]
-                        else:
+                        if newYPositionByX + listeningEntity.physics.hitbox.height < entity.physics.hitbox.top or newYPositionByX > entity.physics.hitbox.top + entity.physics.hitbox.height:
                             #The movement must be returned on y axis
-                            if vertical > 0:
-                                #The movement must be returned to up
-                                #print('up', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ') 
+                            if vertical > 0: 
+                                #The movement must be returned to up  
+                                #print('up', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ')             
                                 listeningEntity.physics.position = [listeningEntity.physics.position[0],  listeningEntity.physics.position[1] + (entity.physics.hitbox.top - listeningEntity.physics.hitbox.height) - listeningEntity.physics.hitbox.top]
-                            elif vertical < 0:
+                            else:
                                 #Te movement must be returned to down
                                 #print('down', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ')
                                 listeningEntity.physics.position = [listeningEntity.physics.position[0],  listeningEntity.physics.position[1] + (entity.physics.hitbox.top + entity.physics.hitbox.height) - listeningEntity.physics.hitbox.top]
-                        listeningEntity.physics.update_hitbox(pygame.Rect(listeningEntity.get_texture_position(), listeningEntity.animation.get_texture().get_size()))
-                        #print(f'nuev: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}')
+                        else:
+                            #The movement must be returned to left
+                            #print('left', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ') 
+                            listeningEntity.physics.position = [listeningEntity.physics.position[0] + (entity.physics.hitbox.left - listeningEntity.physics.hitbox.width) - listeningEntity.physics.hitbox.left, listeningEntity.physics.position[1]]
+                    elif horizontal < 0:
+                        pending = vertical / horizontal
+                        newYPositionByX = (entity.physics.hitbox.left + entity.physics.hitbox.width) * pending + (listeningEntity.physics.hitbox.top - listeningEntity.physics.hitbox.left * pending)
+
+
+                        if newYPositionByX + listeningEntity.physics.hitbox.height < entity.physics.hitbox.top or newYPositionByX > entity.physics.hitbox.top + entity.physics.hitbox.height:
+                            #The movement must be returned on y axis
+                            if vertical > 0:  
+                                #The movement must be returned to up
+                                #print('up', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ')             
+                                listeningEntity.physics.position = [listeningEntity.physics.position[0],  listeningEntity.physics.position[1] + (entity.physics.hitbox.top - listeningEntity.physics.hitbox.height) - listeningEntity.physics.hitbox.top]
+                            else:
+                                #Te movement must be returned to down
+                                #print('down', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ')
+                                listeningEntity.physics.position = [listeningEntity.physics.position[0],  listeningEntity.physics.position[1] + (entity.physics.hitbox.top + entity.physics.hitbox.height) - listeningEntity.physics.hitbox.top]
+                        else:
+                            #The movement must be returned to right
+                            #print('right', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ') 
+                            listeningEntity.physics.position = [listeningEntity.physics.position[0] + (entity.physics.hitbox.left + entity.physics.hitbox.width) - listeningEntity.physics.hitbox.left, listeningEntity.physics.position[1]]
+                    else:
+                        #The movement must be returned on y axis
+                        if vertical > 0:
+                            #The movement must be returned to up
+                            #print('up', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ') 
+                            listeningEntity.physics.position = [listeningEntity.physics.position[0],  listeningEntity.physics.position[1] + (entity.physics.hitbox.top - listeningEntity.physics.hitbox.height) - listeningEntity.physics.hitbox.top]
+                        elif vertical < 0:
+                            #Te movement must be returned to down
+                            #print('down', f'prev: {listeningEntity.physics.previousHitbox.left}, {listeningEntity.physics.previousHitbox.top}; actu: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}', end='; ')
+                            listeningEntity.physics.position = [listeningEntity.physics.position[0],  listeningEntity.physics.position[1] + (entity.physics.hitbox.top + entity.physics.hitbox.height) - listeningEntity.physics.hitbox.top]
+                    listeningEntity.physics.update_hitbox(pygame.Rect(listeningEntity.get_texture_position(), listeningEntity.animation.get_texture().get_size()))
+                    #print(f'nuev: {listeningEntity.physics.hitbox.left}, {listeningEntity.physics.hitbox.top}')
 
                 if changeColor:
                     entity.physics.hitboxColor = (255,100,0)
@@ -360,21 +365,42 @@ def collide_and_limit(listeningEntity:Entity, entitiesList:list[Entity], changeC
             
     if collided:
         if changeColor:
-            listeningEntity.physics.hitboxColor = (255,100,0)
+            listeningEntity.physics.hitboxColor = (255,0,100)
         #listeningEntity.physics.previousPosition
     else:
         if changeColor:
-            listeningEntity.physics.hitboxColor = (0,200,255)
+            listeningEntity.physics.hitboxColor = (255,200,0)
+
+def show_hitboxes(entity:Entity, state:bool):
+    if state:
+        if entity.globals['alternate_show_hitboxes']:
+            entity.showHitboxes = not entity.showHitboxes
+            entity.globals['alternate_show_hitboxes'] = False
+    else:
+        entity.globals['alternate_show_hitboxes'] = True
+
+def show_positions(entity:Entity, state:bool):
+    if state:
+        if entity.globals['alternate_show_positions']:
+            entity.showPositions = not entity.showPositions
+            entity.globals['alternate_show_positions'] = False
+    else:
+        entity.globals['alternate_show_positions'] = True
+
+debug_level_listeners = {pygame.K_h:show_hitboxes, pygame.K_j: show_positions}
 
 class LevelWorksSpace(Entity):
-    def __init__(self, levelSize:tuple, background:Background|list, mainCharacter:MainCharacter, displaySize:tuple, entitiesList:Entity|list=[], physics:list|Physics=Physics([0, 0]), animation=Animation(), location=Location.LEFT_TOP, eventListeners:dict={}, backgroundColor:tuple=(0,0,255)) -> None:
-        super().__init__(physics, animation, location, eventListeners=eventListeners)
+    def __init__(self, levelSize:tuple, background:Background|list, mainCharacter:MainCharacter, displaySize:tuple, entitiesList:Entity|list=[], physics:list|Physics=Physics([0, 0]), animation=Animation(), location=Location.LEFT_TOP, eventListeners:dict=debug_level_listeners, backgroundColor:tuple=(0,0,255),behaviour:types.FunctionType=lambda selfEntity:None, firstInitFps:int=60) -> None:
+        super().__init__(physics, animation, location, eventListeners=eventListeners, behaviour=behaviour)
 
         self.areBackgroundsSorted = False
         self.areEntitiesSorted = False
         self.globals = {}
         self.mainCharacter = mainCharacter
         self.mainCharacter.parent = self
+        self.showHitboxes = False
+        self.showPositions = False
+
 
         self.entities = {}
         if self.mainCharacter.entity_id is not None:
@@ -408,25 +434,49 @@ class LevelWorksSpace(Entity):
                 self.entities[entity.entity_id] = entity.entity_id
         
         self.update_backgrounds()
+        self.update_all(firstInitFps, firstInit=True)
 
-    def update_entities(self, FPS:int=0) -> None:
+    def add_background(self, background:Background):
+        background.parent = self
+        self.backgroundList.append(background)
+        if background.entity_id is not None:
+            self.entities[background.entity_id] = background
+        self.areBackgroundsSorted = False
+    
+    def add_entity(self, entity:Entity):
+        entity.parent = self
+        self.entitiesList.append(entity)
+        if entity.entity_id is not None:
+            self.entities[entity.entity_id] = entity
+        self.areEntitiesSorted = False
+
+    def remove_entity(self, id:int|str, entity:Entity=None):
+        if entity is None:
+            self.entitiesList.remove(self.entities[id])
+            del self.entities[id]
+        else:
+            if entity in self.entitiesList:
+                self.entitiesList.remove(entity)
+            elif entity in self.backgroundList:
+                self.backgroundList.remove(entity)
+
+    def update_entities(self, FPS:int=0, firstInit:bool=False) -> None:
         if not self.areEntitiesSorted:
             self.entitiesList = quick_entities_sort(self.entitiesList)
             self.areEntitiesSorted = True
-            print([entity.get_max_y_texture_position() for entity in self.entitiesList])
         if FPS > 0:
             for entityIndex in range(len(self.entitiesList)):
-                self.entitiesList[entityIndex].update(FPS)
+                self.entitiesList[entityIndex].update(FPS, firstInit=firstInit)
 
     
-    def update_backgrounds(self, FPS:int=0) -> None:
+    def update_backgrounds(self, FPS:int=0, firstInit:bool=False) -> None:
         if not self.areBackgroundsSorted:
             self.backgroundList = quick_backgrounds_sort(self.backgroundList)
             self.areBackgroundsSorted = True
         if FPS > 0:
             self.background.fill(self.backgroundColor)
             for backgroundIndex in range(len(self.backgroundList)):
-                self.backgroundList[backgroundIndex].update(FPS)
+                self.backgroundList[backgroundIndex].update(FPS, firstInit=firstInit)
                 self.background.blit(self.backgroundList[backgroundIndex].get_texture(), self.fitThePosition(self.backgroundList[backgroundIndex].get_texture_position()))
     
     def update_works_space_position(self) -> None:
@@ -453,11 +503,11 @@ class LevelWorksSpace(Entity):
             self.physics.position[1] = -1 * (self.mainCharacter.physics.position[1] - self.displaySize[1] / 2)
             print('e3')
     
-    def update_all(self, FPS:int) -> None:        
-
-        self.mainCharacter.update(FPS)
-        self.update_backgrounds(FPS=FPS)
-        self.update_entities(FPS=FPS)
+    def update_all(self, FPS:int, firstInit:bool=False) -> None:        
+        self.update(FPS, firstInit=firstInit)
+        self.mainCharacter.update(FPS=FPS, firstInit=firstInit)
+        self.update_backgrounds(FPS=FPS, firstInit=firstInit)
+        self.update_entities(FPS=FPS, firstInit=firstInit)
         self.update_works_space_position()
         collide_and_limit(self.mainCharacter, self.entitiesList)
         
@@ -465,18 +515,24 @@ class LevelWorksSpace(Entity):
     def fitThePosition(self, position:list) -> list:
         return self.physics.position[0] + position[0], self.physics.position[1] + position[1]
     
-    def listen_keys(self, keyPressedList) -> None:
+    def listen_keys_all(self, keyPressedList) -> None:
+        self.listen_keys(keyPressedList)
         self.mainCharacter.listen_keys(keyPressedList)
         for background in self.backgroundList:
             background.listen_keys(keyPressedList)
 
-    def show(self, display:pygame.Surface, showHitbox=False) -> None:
+    def show(self, display:pygame.Surface) -> None:
         display.blit(self.background, (0,0))
         isMainCharacterShowed = False
-        if showHitbox:
-            hitboxesImage = pygame.Surface(self.levelSize)
-            hitboxesImage.set_colorkey((0,0,0))
-            pygame.draw.rect(hitboxesImage, self.mainCharacter.physics.hitboxColor, self.mainCharacter.physics.hitbox, 10)
+        if self.showHitboxes or self.showPositions:
+            debugImage = pygame.Surface(self.levelSize)
+            debugImage.set_colorkey((0,0,0))
+
+        if self.showHitboxes:
+            pygame.draw.rect(debugImage, self.mainCharacter.physics.hitboxColor, self.mainCharacter.physics.hitbox, 10)
+
+        if self.showPositions:
+            pygame.draw.circle(debugImage, self.mainCharacter.physics.positionColor, self.mainCharacter.physics.position, 10)
 
         for entity in self.entitiesList:
             if not isMainCharacterShowed and entity.get_max_y_texture_position() > self.mainCharacter.get_max_y_texture_position():
@@ -484,13 +540,19 @@ class LevelWorksSpace(Entity):
                 isMainCharacterShowed = True
                     
             display.blit(entity.animation.get_texture(), self.fitThePosition(entity.get_texture_position()))
-            if showHitbox:
-                pygame.draw.rect(hitboxesImage, entity.physics.hitboxColor, entity.physics.hitbox, 10)
+            if self.showHitboxes:
+                pygame.draw.rect(debugImage, entity.physics.hitboxColor, entity.physics.hitbox, 10)
+                
+            if self.showPositions:
+                pygame.draw.circle(debugImage, entity.physics.positionColor, entity.physics.position, 10)
+
         if not isMainCharacterShowed:
             display.blit(self.mainCharacter.animation.get_texture(), self.fitThePosition(self.mainCharacter.get_texture_position()))
+
+        #pygame.draw.rect(display, (255, 0, 0), (self.fitThePosition(self.mainCharacter.get_texture_position())[0], self.fitThePosition(self.mainCharacter.get_texture_position())[1],self.mainCharacter.animation.get_texture().get_rect().width, self.mainCharacter.animation.get_texture().get_rect().height))
         
-        if showHitbox:
-            display.blit(hitboxesImage, self.fitThePosition((0,0)))
+        if self.showHitboxes or self.showPositions:
+            display.blit(debugImage, self.fitThePosition((0,0)))
         
     
  
