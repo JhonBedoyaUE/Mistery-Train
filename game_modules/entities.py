@@ -3,7 +3,7 @@ from game_modules.utilities import *
         
 class Entity:
 
-    def __init__(self, physics:list|Physics, animation:Animation, location:int=Location.LEFT_TOP, entity_id:int|str=None, eventListeners:dict={}, collideListeners:dict={}, behaviour:types.FunctionType=lambda selfEntity:None) -> None:
+    def __init__(self, physics:list|Physics, animation:Animation, location:int=Location.LEFT_TOP, entity_id:int|str=None, eventListeners:dict={}, collideListeners:dict={}, behaviour:types.FunctionType=lambda selfEntity:None, mouseListener:types.FunctionType=lambda selfEntity, mousePosition, buttons:None, clickableSpace:int=ClickableSpace.SPRITE, EntityType:str=None) -> None:
         """Initialize the object .
 
         Args:
@@ -22,11 +22,28 @@ class Entity:
         self.eventListeners = eventListeners
         self.collideListeners = collideListeners
         self.physics.update_hitbox(pygame.Rect(self.physics.position, self.animation.get_texture().get_size()))
-        self.entity_id = None
+        self.entity_id = entity_id
         self.parent = None
-        self.type = None
+        self.type = EntityType
         self.time= 0
         self.behaviour = behaviour
+        self.mouseListener = mouseListener
+        self.clickableSpace = clickableSpace
+        self.isClicked = False
+        self.isHover = False
+        self.globals = {}
+    
+    def get_clickable_space(self) -> pygame.Rect:
+        if self.clickableSpace == ClickableSpace.SPRITE:
+            return pygame.Rect(self.get_texture_position(),self.animation.get_texture().get_rect().size)
+        else:
+            return self.physics.hitbox
+    
+    def listen_mouse(self, mousePosition, mouseButtons):
+        self.isHover = True
+        self.mouseListener(self, mousePosition, mouseButtons)
+        if mouseButtons[0]:
+            self.isClicked = True
     
     def listen_collide(self, collidedEntity):
         if collidedEntity.type in self.collideListeners.keys():
@@ -48,6 +65,8 @@ class Entity:
             self.animation.update_frame(FPS)      
             self.physics.update_position(FPS)
         self.physics.update_hitbox(pygame.Rect(self.get_texture_position(), self.animation.get_texture().get_size()))
+        self.isClicked = False
+        self.isHover = False
     
     def get_texture_position(self) -> list:
         """AI is creating summary for get_texture_position
@@ -243,8 +262,8 @@ class Background(Entity):
 basicCharacterBehaviour = {pygame.K_LEFT: walk_to_left, pygame.K_RIGHT: walk_to_right, pygame.K_UP: walk_to_up, pygame.K_DOWN: walk_to_down}
 
 class MainCharacter(Entity):
-    def __init__(self, physics:list|Physics, animation:Animation, location=Location.CENTER_BOTTOM, entity_id:int|str=0, eventListeners:dict=basicCharacterBehaviour, collideListeners:dict={},behaviour:types.FunctionType=lambda selfEntity:None):
-        super().__init__(physics, animation, location, entity_id=entity_id, eventListeners=eventListeners, collideListeners=collideListeners, behaviour=behaviour)
+    def __init__(self, physics:list|Physics, animation:Animation, location=Location.CENTER_BOTTOM, entity_id:int|str=0, eventListeners:dict=basicCharacterBehaviour, collideListeners:dict={},behaviour:types.FunctionType=lambda selfEntity:None, mouseListener:types.FunctionType=lambda selfEntity, mousePosition, buttons:None, clickableSpace:int=ClickableSpace.SPRITE):
+        super().__init__(physics, animation, location, entity_id=entity_id, eventListeners=eventListeners, collideListeners=collideListeners, behaviour=behaviour, mouseListener=mouseListener, clickableSpace=clickableSpace)
         self.type = "MainCharacter"
         self.physics.positionColor = 255, 0, 100
 
@@ -387,19 +406,27 @@ def show_positions(entity:Entity, state:bool):
     else:
         entity.globals['alternate_show_positions'] = True
 
-debug_level_listeners = {pygame.K_h:show_hitboxes, pygame.K_j: show_positions}
+def show_clickable_spaces(entity:Entity, state:bool):
+    if state:
+        if entity.globals['alternate_clickable_spaces']:
+            entity.showClickableSpaces = not entity.showClickableSpaces
+            entity.globals['alternate_clickable_spaces'] = False
+    else:
+        entity.globals['alternate_clickable_spaces'] = True
+
+debug_level_listeners = {pygame.K_h:show_hitboxes, pygame.K_j: show_positions, pygame.K_k: show_clickable_spaces}
 
 class LevelWorksSpace(Entity):
-    def __init__(self, levelSize:tuple, background:Background|list, mainCharacter:MainCharacter, displaySize:tuple, entitiesList:Entity|list=[], physics:list|Physics=Physics([0, 0]), animation=Animation(), location=Location.LEFT_TOP, eventListeners:dict=debug_level_listeners, backgroundColor:tuple=(0,0,255),behaviour:types.FunctionType=lambda selfEntity:None, firstInitFps:int=60) -> None:
-        super().__init__(physics, animation, location, eventListeners=eventListeners, behaviour=behaviour)
+    def __init__(self, levelSize:tuple, background:Background|list, mainCharacter:MainCharacter, displaySize:tuple, entitiesList:Entity|list=[], physics:list|Physics=Physics([0, 0]), animation=Animation(), location=Location.LEFT_TOP, eventListeners:dict=debug_level_listeners, backgroundColor:tuple=(0,0,255),behaviour:types.FunctionType=lambda selfEntity:None, firstInitFps:int=60, mouseListener:types.FunctionType=lambda selfEntity, mousePosition, buttons:None) -> None:
+        super().__init__(physics, animation, location, eventListeners=eventListeners, behaviour=behaviour, mouseListener=mouseListener)
 
         self.areBackgroundsSorted = False
         self.areEntitiesSorted = False
-        self.globals = {}
         self.mainCharacter = mainCharacter
         self.mainCharacter.parent = self
         self.showHitboxes = False
         self.showPositions = False
+        self.showClickableSpaces = False
 
 
         self.entities = {}
@@ -520,11 +547,31 @@ class LevelWorksSpace(Entity):
         self.mainCharacter.listen_keys(keyPressedList)
         for background in self.backgroundList:
             background.listen_keys(keyPressedList)
+    
+    def listen_mouse(self, mousePosition:tuple[int], mouseButtons:tuple[bool]):
+        self.mouseListener(self, mousePosition, mouseButtons)
+        isMainCharacterCompared = False
+        mainCharacterClickableSpace = pygame.Rect(self.fitThePosition((self.mainCharacter.get_clickable_space().left, self.mainCharacter.get_clickable_space().top)), self.mainCharacter.get_clickable_space().size)
+        for entity in self.entitiesList[::-1]:
+            if not isMainCharacterCompared and entity.get_max_y_texture_position() < self.mainCharacter.get_max_y_texture_position():
+                if mainCharacterClickableSpace.collidepoint(mousePosition):
+                    self.mainCharacter.listen_mouse(mousePosition, mouseButtons)
+                    break
+                isMainCharacterCompared = True
+            
+            entityClickableSpace = pygame.Rect(self.fitThePosition((entity.get_clickable_space().left, entity.get_clickable_space().top)), entity.get_clickable_space().size)
+            if entityClickableSpace.collidepoint(mousePosition):
+                entity.listen_mouse(mousePosition, mouseButtons)
+                break
+        if not isMainCharacterCompared:
+            if mainCharacterClickableSpace.collidepoint(mousePosition):
+                self.mainCharacter.listen_mouse(mousePosition, mouseButtons)
+
 
     def show(self, display:pygame.Surface) -> None:
         display.blit(self.background, (0,0))
         isMainCharacterShowed = False
-        if self.showHitboxes or self.showPositions:
+        if self.showHitboxes or self.showPositions or self.showClickableSpaces:
             debugImage = pygame.Surface(self.levelSize)
             debugImage.set_colorkey((0,0,0))
 
@@ -533,6 +580,14 @@ class LevelWorksSpace(Entity):
 
         if self.showPositions:
             pygame.draw.circle(debugImage, self.mainCharacter.physics.positionColor, self.mainCharacter.physics.position, 10)
+        
+        if self.showClickableSpaces:
+            if self.mainCharacter.isClicked:
+                pygame.draw.rect(debugImage, (255,0,0), self.mainCharacter.get_clickable_space(), 5)
+            elif self.mainCharacter.isHover:
+                pygame.draw.rect(debugImage, (255,255,0), self.mainCharacter.get_clickable_space(), 5)
+            else:
+                pygame.draw.rect(debugImage, (0,255,0), self.mainCharacter.get_clickable_space(), 5)
 
         for entity in self.entitiesList:
             if not isMainCharacterShowed and entity.get_max_y_texture_position() > self.mainCharacter.get_max_y_texture_position():
@@ -545,6 +600,14 @@ class LevelWorksSpace(Entity):
                 
             if self.showPositions:
                 pygame.draw.circle(debugImage, entity.physics.positionColor, entity.physics.position, 10)
+            
+            if self.showClickableSpaces:
+                if entity.isClicked:
+                    pygame.draw.rect(debugImage, (255,0,0), entity.get_clickable_space(), 5)
+                elif entity.isHover:
+                    pygame.draw.rect(debugImage, (255,255,0), entity.get_clickable_space(), 5)
+                else:
+                    pygame.draw.rect(debugImage, (0,255,0), entity.get_clickable_space(), 5)
 
         if not isMainCharacterShowed:
             display.blit(self.mainCharacter.animation.get_texture(), self.fitThePosition(self.mainCharacter.get_texture_position()))

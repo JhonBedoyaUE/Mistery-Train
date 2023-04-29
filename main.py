@@ -5,6 +5,7 @@ import levels.levelExample as template
 # En el archivo del nivel debe existir una funcion llamada create_level() que retornara el LevelWorsSpace del nivel 
 # Ademas los modulos deben estar en la carpeta /game_modules para mantener en orden los archivos del juego
 # Aún falta integracion con el mouse, textos o menus contextuales
+
 pygame.init()
 
 FPS = 60
@@ -26,13 +27,16 @@ while running:
         break
 
     screen.fill((0,0,0))
-    levelWorksSpace.update_all(FPS)
 
     keys = pygame.key.get_pressed()
+
+    levelWorksSpace.listen_mouse(pygame.mouse.get_pos(), pygame.mouse.get_pressed(3))
 
     levelWorksSpace.listen_keys_all(pygame.key.get_pressed())
 
 
     levelWorksSpace.show(screen)
+
+    levelWorksSpace.update_all(FPS)
     pygame.display.update()
     CLOCK.tick(FPS)

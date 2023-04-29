@@ -1,5 +1,9 @@
 import pygame, types, math
 
+class ClickableSpace:
+    SPRITE = 0
+    HITBOX = 1
+
 class Direction:
     LEFT = 0
     UP = 1
@@ -303,6 +307,3 @@ class Physics:
                 self.isPositionChanged = False
             else:
                 self.isPositionChanged = True
-
-class EventListener:
-    pass
