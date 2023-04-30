@@ -115,14 +115,16 @@ def walk_to_left(entity:Entity, state:bool) -> None:
         entity (Entity): [description]
         state (bool): [description]
     """
+    if not 'prefix' in entity.globals.keys():
+            entity.globals['prefix'] = ''
     if state:
         entity.physics.direction = Direction.LEFT
         entity.physics.velocity[0] = -200
-        entity.animation.change_actual_texture('xflip_Walk')
+        entity.animation.change_actual_texture(entity.globals['prefix']+'xflip_Walk')
     else:
         if entity.physics.velocity[0] == -200:
             entity.physics.velocity[0] = 0
-            entity.animation.change_actual_texture('xflip_Idle')
+            entity.animation.change_actual_texture(entity.globals['prefix']+'xflip_Idle')
     
 def walk_to_right(entity:Entity, state:bool) -> None:
     """Turn the entity to the right .
@@ -131,14 +133,16 @@ def walk_to_right(entity:Entity, state:bool) -> None:
         entity (Entity): [description]
         state (bool): [description]
     """
+    if not 'prefix' in entity.globals.keys():
+            entity.globals['prefix'] = ''
     if state:
         entity.physics.direction = Direction.RIGHT
         entity.physics.velocity[0] = 200
-        entity.animation.change_actual_texture('Walk')
+        entity.animation.change_actual_texture(entity.globals['prefix']+'Walk')
     else:
         if entity.physics.velocity[0] == 200:
             entity.physics.velocity[0] = 0
-            entity.animation.change_actual_texture('Idle')
+            entity.animation.change_actual_texture(entity.globals['prefix']+'Idle')
 
 def walk_to_up(entity:Entity, state:bool) -> None:
     """Walk the scene to the animation .
@@ -147,36 +151,40 @@ def walk_to_up(entity:Entity, state:bool) -> None:
         entity (Entity): [description]
         state (bool): [description]
     """
+    if not 'prefix' in entity.globals.keys():
+            entity.globals['prefix'] = ''
     if state:
         #entity.direction = Direction.UP
         entity.physics.velocity[1] = -200
         if entity.physics.direction == Direction.LEFT:
-            entity.animation.change_actual_texture('xflip_Walk')
+            entity.animation.change_actual_texture(entity.globals['prefix']+'xflip_Walk')
         else:
-            entity.animation.change_actual_texture('Walk')
+            entity.animation.change_actual_texture(entity.globals['prefix']+'Walk')
     else:
         if entity.physics.velocity[1] == -200:
             entity.physics.velocity[1] = 0
             if entity.physics.direction == Direction.LEFT:
-                entity.animation.change_actual_texture('xflip_Idle')
+                entity.animation.change_actual_texture(entity.globals['prefix']+'xflip_Idle')
             else:
-                entity.animation.change_actual_texture('Idle')
+                entity.animation.change_actual_texture(entity.globals['prefix']+'Idle')
     
 def walk_to_down(entity:Entity, state:bool) -> None:
+    if not 'prefix' in entity.globals.keys():
+            entity.globals['prefix'] = ''
     if state:
         #entity.direction = Direction.DOWN
         entity.physics.velocity[1] = 200
         if entity.physics.direction == Direction.LEFT:
-            entity.animation.change_actual_texture('xflip_Walk')
+            entity.animation.change_actual_texture(entity.globals['prefix']+'xflip_Walk')
         else:
-            entity.animation.change_actual_texture('Walk')
+            entity.animation.change_actual_texture(entity.globals['prefix']+'Walk')
     else:
         if entity.physics.velocity[1] == 200:
             entity.physics.velocity[1] = 0
             if entity.physics.direction == Direction.LEFT:
-                entity.animation.change_actual_texture('xflip_Idle')
+                entity.animation.change_actual_texture(entity.globals['prefix']+'xflip_Idle')
             else:
-                entity.animation.change_actual_texture('Idle')
+                entity.animation.change_actual_texture(entity.globals['prefix']+'Idle')
         
 class Background(Entity):
 
@@ -528,7 +536,7 @@ class LevelWorksSpace(Entity):
 
         else:
             self.physics.position[1] = -1 * (self.mainCharacter.physics.position[1] - self.displaySize[1] / 2)
-            print('e3')
+            
     
     def update_all(self, FPS:int, firstInit:bool=False) -> None:        
         self.update(FPS, firstInit=firstInit)
@@ -614,7 +622,7 @@ class LevelWorksSpace(Entity):
 
         #pygame.draw.rect(display, (255, 0, 0), (self.fitThePosition(self.mainCharacter.get_texture_position())[0], self.fitThePosition(self.mainCharacter.get_texture_position())[1],self.mainCharacter.animation.get_texture().get_rect().width, self.mainCharacter.animation.get_texture().get_rect().height))
         
-        if self.showHitboxes or self.showPositions:
+        if self.showHitboxes or self.showPositions or self.showClickableSpaces:
             display.blit(debugImage, self.fitThePosition((0,0)))
         
     

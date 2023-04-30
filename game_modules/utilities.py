@@ -128,17 +128,44 @@ class Transformation:
                     textureScalar = scalarBase[0] * scalar / frame.get_rect().width
             negativeSprite.append(invert_colors(extract_content(pygame.transform.scale_by(frame, textureScalar), extractContent), (variationIndex != 0)))
         return {'sprite': Texture(negativeSprite), 'name': ('negative_'*(variationIndex != 0))+name}
+    
+    def RECT_ROTATION(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+        flippedSprite = []
+        for frame in sprite.sprite:
+            textureScalar = scalar
+            if scalarBase != (0, 0):
+                textureAspectRatio = frame.get_rect().height / frame.get_rect().width
+                displayAspectRatio = scalarBase[1] / scalarBase[0]
+                if textureAspectRatio <= displayAspectRatio:
+                    textureScalar = scalarBase[1] * scalar / frame.get_rect().height
+                else:
+                    textureScalar = scalarBase[0] * scalar / frame.get_rect().width
+            flippedSprite.append(extract_content(pygame.transform.scale_by(pygame.transform.rotate(frame, 90*variationIndex), textureScalar), extractContent))
+        return {'sprite': Texture(flippedSprite), 'name': (f'{90*variationIndex}rotated_'*(variationIndex != 0))+name}
 
 
         
-def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/', variations:int=1, transformFunction:types.FunctionType=Transformation.BASIC, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/', variations:int|tuple[int]=1, transformFunctions:types.FunctionType|tuple[types.FunctionType]=Transformation.BASIC, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
     textures = {'default': Texture(pygame.Surface((500, 500)), 1)}
     for index in range(len(fileNameList)):
         sprite = pygame.image.load(path + fileNameList[index]).convert_alpha()
-        for variationIndex in range(variations):
-            texture = Texture(sprite, spriteLeghtList[index])
-            textureVariation = transformFunction(texture, variationIndex, fileNameList[index].split('.')[0], scalar, extractContent, scalarBase=scalarBase)
-            textures[textureVariation['name']] = textureVariation['sprite']
+        textures[fileNameList[index].split('.')[0]] = Transformation.BASIC(Texture(sprite, spriteLeghtList[index]), 0, '', scalar, extractContent, scalarBase=scalarBase)['sprite']
+
+    if (not isinstance(variations, list)) and (not isinstance(variations, tuple)):
+        variations = [variations]
+    
+    if (not isinstance(transformFunctions, list)) and (not isinstance(transformFunctions, tuple)):
+        transformFunctions = [transformFunctions]
+    
+    
+
+    for transformFunctionIndex in range(len(transformFunctions)):
+        procesingTextures = textures.copy()
+        for TextureName, loadedTexture in procesingTextures.items():
+            for variationIndex in range(variations[transformFunctionIndex]):
+                textureVariation = transformFunctions[transformFunctionIndex](loadedTexture, variationIndex, TextureName)
+                textures[textureVariation['name']] = textureVariation['sprite']
+
     return textures
 
 def create_empty_texture(width:int, height:int, name:str='default', scalar:float=1, scalarBase:tuple=(0,0)):

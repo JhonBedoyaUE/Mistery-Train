@@ -3,15 +3,14 @@ from game_modules.entities import *
 from game_modules.utilities import *
 import levels.levelExample as template
 
+class GameManager:
+    pass
+
 def start_game(windowSize:tuple[int]=(800,600), FPS:int=60):
     pygame.init()
-
     CLOCK = pygame.time.Clock()
-
     screen = pygame.display.set_mode(windowSize)
-
     levelWorksSpace = template.create_level(windowSize)
-
     running = True
 
     while running:
@@ -24,15 +23,13 @@ def start_game(windowSize:tuple[int]=(800,600), FPS:int=60):
 
         screen.fill((0,0,0))
 
-        keys = pygame.key.get_pressed()
-
         levelWorksSpace.listen_mouse(pygame.mouse.get_pos(), pygame.mouse.get_pressed(3))
-
-        levelWorksSpace.listen_keys_all(pygame.key.get_pressed())
-
+        keys = pygame.key.get_pressed()
+        levelWorksSpace.listen_keys_all(keys)
 
         levelWorksSpace.show(screen)
 
         levelWorksSpace.update_all(FPS)
+        
         pygame.display.update()
         CLOCK.tick(FPS)
