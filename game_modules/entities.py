@@ -745,5 +745,11 @@ class ContextualMenu(LevelWorksSpace):
         self.preventOthersUpdates = preventOthersUpdates
         self.closeAllMenusBeforeShow = closeAllMenusBeforeShow
         self.closeOnClickOutside = closeOnClickOutside
+    
+    def close(self):
+        pass
+    
+    def pause(self):
+        pass
 
  

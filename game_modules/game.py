@@ -14,11 +14,29 @@ class GameManager:
         self.CLOCK = pygame.time.Clock()
         self.contextualMenusStack = [] # List of the loaded contextual menus
         #self.contextualMenusStack[0].physics.position = [400,500]
-        self.defaultMenu = create_game_inventary_interface() # Default menu to show when all menus closed
+        self.defaultMenu = None#create_game_inventary_interface() # Default menu to show when all menus closed
         self.worksSpacesStack = [template.create_level(windowSize)] # List of loaded levels
         self.actualLevel = 0 # Actual position of the actual level in the workspacesStack
         self.isInTrasition = False # Determines if theres a transition happenning
         self.finalLevelTransition = None # The position of the destiny level 
+
+        for menu in self.contextualMenusStack:
+            menu.parent = self
+        
+        if self.defaultMenu is not None:
+            self.defaultMenu.parent = self
+
+        for level in self.worksSpacesStack:
+            level.parent = self
+    
+    def show_menu(self, newMenu:ContextualMenu):
+        newMenu.parent = self
+        if newMenu.closeAllMenusBeforeShow:
+            for menu in self.contextualMenusStack:
+                menu.close()
+            self.contextualMenusStack = []
+        
+        self.contextualMenusStack.append(newMenu)
 
 
 
@@ -37,20 +55,34 @@ class GameManager:
 
             mousePosition = pygame.mouse.get_pos()
             mousePressed = pygame.mouse.get_pressed(3)
-
-            self.worksSpacesStack[self.actualLevel].listen_mouse(mousePosition, mousePressed)
-            self.defaultMenu.listen_mouse(mousePosition, mousePressed)
-
             keys = pygame.key.get_pressed()
-            self.worksSpacesStack[self.actualLevel].listen_keys_all(keys)
-            self.defaultMenu.listen_keys_all(keys)
-
-            self.worksSpacesStack[self.actualLevel].show(self.windowSurface)
-            self.defaultMenu.show(self.windowSurface)
-
-            self.worksSpacesStack[self.actualLevel].update_all(self.FPS)
-            self.defaultMenu.update_all(self.FPS)
             
+            if len(self.contextualMenusStack) > 0:
+                entitiesStack = self.contextualMenusStack[::-1]
+            elif self.defaultMenu is not None:
+                entitiesStack = [self.defaultMenu]
+            else:
+                entitiesStack = []
+            
+            entitiesStack += self.worksSpacesStack[::-1]
+
+            listenning = True
+            for entity in entitiesStack:
+                entity.update_all(self.FPS)
+                if listenning:
+                    entity.listen_keys_all(keys)
+                    entity.listen_mouse(mousePosition, mousePressed)
+                    listenning = not entity.preventOthersListening
+
+                
+                if entity.preventOthersUpdates:
+                    break
+            
+            for entity in entitiesStack[::-1]:
+                entity.show(self.windowSurface)
             
             pygame.display.update()
+
+            if keys[pygame.K_p]:
+                self.show_menu(create_paused_menu())
             self.CLOCK.tick(self.FPS)

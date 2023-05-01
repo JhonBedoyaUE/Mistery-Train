@@ -1,5 +1,6 @@
 from game_modules.entities import *
 from game_modules.utilities import *
+from menus.basic_game_menus import *
 
 def move_level(entity:LevelWorksSpace):
     if entity.time >= 3:
@@ -71,7 +72,10 @@ def change_to_negative(selfEntity:Entity, mousePosition:tuple[int], buttons:tupl
         selfEntity.globals['isClickUp'] = True
 
 
-
+def mouse_listener_text(selfEntity:Entity, mousePosition:tuple[int], buttons:tuple[bool]):
+    if buttons[0]:
+        selfEntity.parent.parent.show_menu(create_game_inventary_interface())
+        selfEntity.parent.remove_entity(0, entity=selfEntity)
 
 def create_level(SIZE:tuple[int]) -> LevelWorksSpace:
     """Crea un nivel de ejemplo.
@@ -95,6 +99,10 @@ def create_level(SIZE:tuple[int]) -> LevelWorksSpace:
     
     ch1Textures = create_textures(['chair1.png'], [1], scalarBase=mcSize, scalar=1.2, transformFunctions=Transformation.NEGATIVE_COLOR, variations=2)
 
+    font = pygame.font.SysFont('Verdana', 20)
+
+    text = Entity(Physics([700, 300]), TextIconAnimation('NO ME TOQUES!', font, (255, 0, 0, 255), backgroundColor=(0,0,0,0)), mouseListener=mouse_listener_text)
+
 
     # Creando Las diferentes entidades a usar como los fondos, el personaje principal, los limites o como mas abajo entidades 'silla'  
     bg1 = Background(Physics([0,0]), Animation(textures=bg1Textures, actualTexture='bg1', zIndex=2), SIZE, scalar=1)
@@ -112,7 +120,7 @@ def create_level(SIZE:tuple[int]) -> LevelWorksSpace:
     bottomLimit = Entity(Physics([0,bg1.animation.get_texture().get_rect().size[1]], isCollidable=True), Animation(create_empty_texture(bg1.animation.get_texture().get_rect().size[0], 10), isAnimated=False))
 
     # Guardando los limites en la lista de entidades a cargar en el juego
-    entitiesList = [leftLimit, topLimit, rightLimit, bottomLimit]
+    entitiesList = [leftLimit, topLimit, rightLimit, bottomLimit, text]
 
     # Creando las entidades silla de forma dinamica
     for i in range(10):
