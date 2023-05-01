@@ -1,5 +1,11 @@
 import pygame, types, math
 
+
+
+class FitThePositionBehaviour:
+    FOLLOW_MAIN_CHARACTER = 0
+    TO_LOCATION = 1
+
 class ClickableSpace:
     SPRITE = 0
     HITBOX = 1
@@ -34,17 +40,20 @@ class AnimationIterationBehavior:
     ONCE = 1
 
 class Texture:
-    def __init__(self, sprite:pygame.Surface, lenght:int=-1) -> None:
+    def __init__(self, sprite:list[pygame.Surface], lenght:int=-1, size:tuple[int, int] = [0, 0]) -> None:
         if lenght >= 0:
             self.lenght = lenght
             self.sprite = []
-            spriteWidth = math.floor(sprite.get_rect().width / lenght)
-            spriteHeight = sprite.get_rect().height
+            self.size = [math.floor(sprite.get_rect().width / lenght), sprite.get_rect().height]
             for i in range(lenght):
-                self.sprite.append(sprite.subsurface((spriteWidth * i, 0, spriteWidth, spriteHeight)))
+                self.sprite.append(sprite.subsurface((self.size[0] * i, 0, self.size[0], self.size[1])))
         else:
             self.lenght = len(sprite)
             self.sprite = sprite
+            if len(self.sprite) >= 1:
+                self.size = self.sprite[0].get_rect().size
+            else:
+                self.size = size
 
 def find_content(surface:pygame.Surface) -> pygame.Rect:
     minX = surface.get_width()
@@ -146,7 +155,7 @@ class Transformation:
 
         
 def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/', variations:int|tuple[int]=1, transformFunctions:types.FunctionType|tuple[types.FunctionType]=Transformation.BASIC, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
-    textures = {'default': Texture(pygame.Surface((500, 500)), 1)}
+    textures = {'default': Texture(pygame.Surface((500, 500), pygame.SRCALPHA), 1)}
     for index in range(len(fileNameList)):
         sprite = pygame.image.load(path + fileNameList[index]).convert_alpha()
         textures[fileNameList[index].split('.')[0]] = Transformation.BASIC(Texture(sprite, spriteLeghtList[index]), 0, '', scalar, extractContent, scalarBase=scalarBase)['sprite']
@@ -169,10 +178,35 @@ def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/
     return textures
 
 def create_empty_texture(width:int, height:int, name:str='default', scalar:float=1, scalarBase:tuple=(0,0)):
-    emptySprite = pygame.Surface((width, height))
+    emptySprite = pygame.Surface((width, height), pygame.SRCALPHA)
     emptySprite.set_alpha(0)
     textureVariation = Transformation.BASIC(Texture(emptySprite, 1), None, name, scalar=scalar, scalarBase=scalarBase)
     return {name: textureVariation['sprite']}
+
+def create_text_texture(text:str, textColor:tuple[int, int, int, int], font:pygame.font.Font, name:str='default', scalar:float=1, scalarBase:tuple=(0,0)):
+    textLines = text.split('\n')
+    renderedTextLines = [font.render(line, True, textColor) for line in textLines]
+
+    joinedLines = renderedTextLines[0].copy()
+
+    for line in renderedTextLines[1:]:
+        width = joinedLines.get_width()
+
+        if line.get_width() > width:
+            width = line.get_width()
+
+        height = joinedLines.get_height() + line.get_height()
+        joinedToActualLine = pygame.Surface((width, height), pygame.SRCALPHA)
+        joinedToActualLine.blit(joinedLines, (0,0))
+        joinedToActualLine.blit(line, (0, height - line.get_height()))
+        joinedLines = joinedToActualLine
+    
+    textureVariation = Transformation.BASIC(Texture(joinedLines, 1), None, name, scalar=scalar, scalarBase=scalarBase)
+    return {name: textureVariation['sprite']}
+    
+
+
+
 
 def create_hitbox(dimentions:pygame.Rect, margin:list, hitboxSize:list[int], hitboxLocation:int, previousPosition:list[int]=None, actualPosition:list[int]=None, actualHitbox:pygame.Rect=None) -> pygame.Rect:
         if len(margin) == 1:
@@ -225,7 +259,7 @@ def create_hitbox(dimentions:pygame.Rect, margin:list, hitboxSize:list[int], hit
         return pygame.Rect(newLeft, newTop, newWidth, newHeigth)
 
 class Animation:
-    def __init__(self, textures:dict=create_textures([], []), actualTexture:str='default', zIndex:int=0, frame:int=0, startFrame:int = 0, frameLimit:int=0, FPS:int=10, animationTime:int=0, animationIterationBehavior:int=AnimationIterationBehavior.INFINITE, animationIterationLimit:int=1, animationIterationCount:int=0, isAnimated:bool=True) -> None:
+    def __init__(self, textures:dict[any, Texture]=create_textures([], []), actualTexture:str='default', zIndex:int=0, frame:int=0, startFrame:int = 0, frameLimit:int=0, FPS:int=10, animationTime:int=0, animationIterationBehavior:int=AnimationIterationBehavior.INFINITE, animationIterationLimit:int=1, animationIterationCount:int=0, isAnimated:bool=True) -> None:
         self.textures = textures
         self.actualTexture = actualTexture
         self.zIndex = zIndex
@@ -244,7 +278,7 @@ class Animation:
             time = 1 / FPS
             self.animationTime += time
             self.frame = math.floor(self.animationTime * self.FPS) + self.startFrame
-            self.limit_frame()  
+            self.limit_frame() 
     
     def get_frame_limit(self) -> int:
         if self.frameLimit == 0:
@@ -287,6 +321,62 @@ class Animation:
 
     def get_texture(self) -> pygame.Surface:
         return self.textures[self.actualTexture].sprite[self.frame]
+        
+class IconAnimation(Animation):
+    def __init__(self, textures: dict[any, Texture] = create_textures([], []), actualTexture: str = 'default', zIndex: int = 0, frame: int = 0, startFrame: int = 0, frameLimit: int = 0, FPS: int = 10, animationTime: int = 0, animationIterationBehavior: int = AnimationIterationBehavior.INFINITE, animationIterationLimit: int = 1, animationIterationCount: int = 0, isAnimated: bool = True, background:Animation=None, backgroundColor:tuple[int, int, int, int]=(255,0,255, 120)) -> None:
+
+        super().__init__(textures, actualTexture, zIndex, frame, startFrame, frameLimit, FPS, animationTime, animationIterationBehavior, animationIterationLimit, animationIterationCount, isAnimated)
+        
+        self.background = background
+        self.backgroundColor = backgroundColor
+    
+    def update_frame(self, FPS:int):
+        if self.isAnimated:
+            time = 1 / FPS
+            self.animationTime += time
+            self.frame = math.floor(self.animationTime * self.FPS) + self.startFrame
+            self.limit_frame() 
+            if self.background is not None:
+                self.background.update_frame(FPS)
+    
+    def get_texture(self) -> pygame.Surface:
+        texture = pygame.Surface(self.textures[self.actualTexture].sprite[self.frame].get_rect().size, pygame.SRCALPHA)
+        texture.fill(self.backgroundColor)
+        
+        if self.background is not None:
+            texture.blit(self.background.get_texture(), (0,0))
+
+        texture.blit(self.textures[self.actualTexture].sprite[self.frame], (0,0))
+            
+        return texture
+
+class TextIconAnimation(IconAnimation):
+    def __init__(self, text:str, font:pygame.font.Font, textColor:tuple[int, int, int, int] =  (0, 0, 0, 255), actualTexture: str = 'default', zIndex: int = 0, frame: int = 0, startFrame: int = 0, frameLimit: int = 0, FPS: int = 10, animationTime: int = 0, animationIterationBehavior: int = AnimationIterationBehavior.INFINITE, animationIterationLimit: int = 1, animationIterationCount: int = 0, isAnimated: bool = True, background: Animation = None, backgroundColor: tuple[int, int, int, int] = (255, 0, 255, 120)) -> None:
+        super().__init__(create_text_texture(text, textColor, font), actualTexture, zIndex, frame, startFrame, frameLimit, FPS, animationTime, animationIterationBehavior, animationIterationLimit, animationIterationCount, isAnimated, background, backgroundColor)
+    
+        self.text = text
+        self.previousText = text
+        self.font = font
+        self.previousFont = font
+        self.textColor = textColor
+        self.previousTextColor = textColor
+
+    def update_frame(self, FPS:int):
+        if self.isAnimated:
+            time = 1 / FPS
+            self.animationTime += time
+            self.frame = math.floor(self.animationTime * self.FPS) + self.startFrame 
+            self.limit_frame()
+
+            if self.text != self.previousText or self.font != self.previousFont or self.textColor != self.previousTextColor:
+                self.textures = create_text_texture(self.text, self.textColor, self.font)
+                self.previousText = self.text
+                self.previousFont = self.font
+                self.previousTextColor = self.textColor
+
+            if self.background is not None:
+                self.background.update_frame(FPS)
+
 
 
 class Physics:
@@ -334,3 +424,13 @@ class Physics:
                 self.isPositionChanged = False
             else:
                 self.isPositionChanged = True
+    
+    def move_position(self, entity, offsetPosition:list[int]):
+        if self.previousPosition != [None, None]:
+            self.previousPosition[0] += offsetPosition[0]
+            self.previousPosition[1] += offsetPosition[1]
+        self.hitbox = create_hitbox(pygame.Rect(entity.get_texture_position(), entity.animation.get_texture().get_size()), self.margin, self.hitboxSize, self.hitboxLocation, previousPosition=self.previousPosition, actualPosition=self.position, actualHitbox=self.hitbox)
+        pygame.Rect(self.hitbox.left + 0.1, self.hitbox.top + 0.1, self.hitbox.width, self.hitbox.height)
+        self.previousHitbox = self.hitbox.copy()
+        self.position[0] += offsetPosition[0]
+        self.position[1] += offsetPosition[1]

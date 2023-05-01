@@ -1,5 +1,6 @@
 import pygame, math
 from game_modules.utilities import *
+from game_modules.utilities import Animation, FitThePositionBehaviour, Location, Physics, types
         
 class Entity:
 
@@ -263,10 +264,6 @@ class Background(Entity):
         else:
             return 0,0
         
-
-
-
-
 basicCharacterBehaviour = {pygame.K_LEFT: walk_to_left, pygame.K_RIGHT: walk_to_right, pygame.K_UP: walk_to_up, pygame.K_DOWN: walk_to_down}
 
 class MainCharacter(Entity):
@@ -274,7 +271,6 @@ class MainCharacter(Entity):
         super().__init__(physics, animation, location, entity_id=entity_id, eventListeners=eventListeners, collideListeners=collideListeners, behaviour=behaviour, mouseListener=mouseListener, clickableSpace=clickableSpace)
         self.type = "MainCharacter"
         self.physics.positionColor = 255, 0, 100
-
 
 def quick_backgrounds_sort(backgroundsList:list):
     if 0 < len(backgroundsList) - 1:
@@ -425,27 +421,39 @@ def show_clickable_spaces(entity:Entity, state:bool):
 debug_level_listeners = {pygame.K_h:show_hitboxes, pygame.K_j: show_positions, pygame.K_k: show_clickable_spaces}
 
 class LevelWorksSpace(Entity):
-    def __init__(self, levelSize:tuple, background:Background|list, mainCharacter:MainCharacter, displaySize:tuple, entitiesList:Entity|list=[], physics:list|Physics=Physics([0, 0]), animation=Animation(), location=Location.LEFT_TOP, eventListeners:dict=debug_level_listeners, backgroundColor:tuple=(0,0,255),behaviour:types.FunctionType=lambda selfEntity:None, firstInitFps:int=60, mouseListener:types.FunctionType=lambda selfEntity, mousePosition, buttons:None) -> None:
-        super().__init__(physics, animation, location, eventListeners=eventListeners, behaviour=behaviour, mouseListener=mouseListener)
+    def __init__(self, levelSize:tuple, background:Background|list, mainCharacter:MainCharacter, displaySize:tuple, entitiesList:Entity|list, entity_id:int|str, physics:list|Physics=Physics([0, 0]), animation=Animation(), location=Location.LEFT_TOP, eventListeners:dict=debug_level_listeners, backgroundColor:tuple=(0,0,255, 0),behaviour:types.FunctionType=lambda selfEntity:None, firstInitFps:int=60, mouseListener:types.FunctionType=lambda selfEntity, mousePosition, buttons:None, fitThePositionBehaviour:int=FitThePositionBehaviour.FOLLOW_MAIN_CHARACTER) -> None:
+        super().__init__(physics, animation, location, entity_id=entity_id, eventListeners=eventListeners, behaviour=behaviour, mouseListener=mouseListener)
 
+        self.physics.previousPosition = [0, 0]
+        self.physics.isPositionChanged = True
         self.areBackgroundsSorted = False
         self.areEntitiesSorted = False
         self.mainCharacter = mainCharacter
-        self.mainCharacter.parent = self
         self.showHitboxes = False
         self.showPositions = False
         self.showClickableSpaces = False
+        self.preventOthersUpdates = False
+        self.preventOthersListening = False
+        self.fitThePositionBehaviour = fitThePositionBehaviour
+        self.updateMainCharacter = self.mainCharacter is not None
+        self.fitMainCharacterPosition = self.mainCharacter is not None
+        self.offsetPosition = [0, 0]
+        self.drawPosition = [0, 0]
+        self.cutOuterBackground = True
+        self.sharedEntities = [] # Here will be the shared entities from others levels, they haven't to be updated
 
 
         self.entities = {}
-        if self.mainCharacter.entity_id is not None:
-            self.entities[self.mainCharacter.entity_id] = self.mainCharacter.entity_id
+        if self.mainCharacter is not None:
+            self.mainCharacter.parent = self
+            if self.mainCharacter.entity_id is not None:
+                self.entities[self.mainCharacter.entity_id] = self.mainCharacter.entity_id
 
 
         self.displaySize = displaySize
         self.levelSize =levelSize
         self.backgroundColor = backgroundColor
-        self.background = pygame.Surface(displaySize)
+        self.background = pygame.Surface(displaySize, pygame.SRCALPHA)
         self.type = "LevelWorksSpace"
         
         if isinstance(background, Background):
@@ -503,7 +511,6 @@ class LevelWorksSpace(Entity):
             for entityIndex in range(len(self.entitiesList)):
                 self.entitiesList[entityIndex].update(FPS, firstInit=firstInit)
 
-    
     def update_backgrounds(self, FPS:int=0, firstInit:bool=False) -> None:
         if not self.areBackgroundsSorted:
             self.backgroundList = quick_backgrounds_sort(self.backgroundList)
@@ -513,68 +520,150 @@ class LevelWorksSpace(Entity):
             for backgroundIndex in range(len(self.backgroundList)):
                 self.backgroundList[backgroundIndex].update(FPS, firstInit=firstInit)
                 self.background.blit(self.backgroundList[backgroundIndex].get_texture(), self.fitThePosition(self.backgroundList[backgroundIndex].get_texture_position()))
-    
+            if self.cutOuterBackground:
+                left = 0
+                width = self.displaySize[0]
+                if 0 <= self.physics.position[0] <= self.displaySize[0]:
+                    left = self.physics.position[0]
+                    width = self.displaySize[0] - self.physics.position[0]
+                elif 0 >= self.displaySize[0] - self.levelSize[0] >= self.physics.position[0] >= - self.levelSize[0]:
+                    width = self.levelSize[0] + self.physics.position[0]
+                elif self.physics.position[0] < - self.levelSize[0] or self.physics.position[0] > self.displaySize[0]:
+                    width = 0
+                top = 0
+                height = self.displaySize[1]
+                if 0 <= self.physics.position[1] <= self.displaySize[1]:
+                    top = self.physics.position[1]
+                    height = self.displaySize[1] - self.physics.position[1]
+                elif 0 >= self.displaySize[1] - self.levelSize[1] >= self.physics.position[1] >= - self.levelSize[1]:
+                    height = self.levelSize[1] + self.physics.position[1]
+                elif self.physics.position[1] < - self.levelSize[1] or self.physics.position[1] > self.displaySize[1]:
+                    height = 0
+
+                cuttedBackground = self.background.subsurface(left, top, width, height).copy()
+                self.background.fill(self.backgroundColor)
+                self.background.blit(cuttedBackground, (left ,top))
+
     def update_works_space_position(self) -> None:
-        """Compute the works space position to try centrate de main character."""
+        """Compute the works space position to try centrate a specific point."""
+        if self.fitThePositionBehaviour == FitThePositionBehaviour.FOLLOW_MAIN_CHARACTER and self.mainCharacter is not None:
+            # Compute the works space position to try centrate de main character
+            # computing axis x position offset
+            if self.mainCharacter.physics.position[0] <= self.displaySize[0] / 2:
+                self.drawPosition[0] = 0
 
-        # computing axis x position offset
-        if self.mainCharacter.physics.position[0] <= self.displaySize[0] / 2:
-            self.physics.position[0] = 0
+            elif self.mainCharacter.physics.position[0] >= self.levelSize[0] - self.displaySize[0] / 2:
+                self.drawPosition[0] = -1 * (self.levelSize[0] - self.displaySize[0])
 
-        elif self.mainCharacter.physics.position[0] >= self.levelSize[0] - self.displaySize[0] / 2:
-            self.physics.position[0] = -1 * (self.levelSize[0] - self.displaySize[0])
+            else:
+                self.drawPosition[0] = -1 * (self.mainCharacter.physics.position[0] - self.displaySize[0] / 2)
 
-        else:
-            self.physics.position[0] = -1 * (self.mainCharacter.physics.position[0] - self.displaySize[0] / 2)
+            # computing axis y position offset 
+            if self.mainCharacter.physics.position[1] <= self.displaySize[1] / 2:
+                self.drawPosition[1] = 0
 
-        # computing axis y position offset 
-        if self.mainCharacter.physics.position[1] <= self.displaySize[1] / 2:
-            self.physics.position[1] = 0
+            elif self.mainCharacter.physics.position[1] >= self.levelSize[1] - self.displaySize[1] / 2:
+                self.drawPosition[1] = -1 * (self.levelSize[1] - self.displaySize[1])
 
-        elif self.mainCharacter.physics.position[1] >= self.levelSize[1] - self.displaySize[1] / 2:
-            self.physics.position[1] = -1 * (self.levelSize[1] - self.displaySize[1])
-
-        else:
-            self.physics.position[1] = -1 * (self.mainCharacter.physics.position[1] - self.displaySize[1] / 2)
-            
+            else:
+                self.drawPosition[1] = -1 * (self.mainCharacter.physics.position[1] - self.displaySize[1] / 2)
+        elif self.location == Location.LEFT_TOP:
+            self.drawPosition = [0, 0]
+        elif self.location == Location.CENTER_TOP:
+            self.drawPosition[0] = self.displaySize[0] / 2 - self.levelSize[0] / 2 
+            self.drawPosition[1] = 0
+        elif self.location == Location.RIGHT_TOP:
+            self.drawPosition[0] = self.displaySize[0] - self.levelSize[0] 
+            self.drawPosition[1] = 0
+        elif self.location == Location.CENTER_RIGHT:
+            self.drawPosition[0] = self.displaySize[0] - self.levelSize[0]  
+            self.drawPosition[1] = self.displaySize[1] / 2 - self.levelSize[1] / 2 
+        elif self.location == Location.RIGHT_BOTTOM:
+            self.drawPosition[0] = self.displaySize[0] - self.levelSize[0] 
+            self.drawPosition[1] = self.displaySize[1] - self.levelSize[1]
+        elif self.location == Location.CENTER_BOTTOM:
+            self.drawPosition[0] = self.displaySize[0] / 2 - self.levelSize[0] / 2 
+            self.drawPosition[1] = self.displaySize[1] - self.levelSize[1]
+        elif self.location == Location.LEFT_BOTTOM:
+            self.drawPosition[0] = 0
+            self.drawPosition[1] = self.displaySize[1] - self.levelSize[1]
+        elif self.location == Location.CENTER_LEFT:
+            self.drawPosition[0] = 0
+            self.drawPosition[1] = self.displaySize[1] / 2 - self.levelSize[1] / 2 
+        elif self.location == Location.CENTER:
+            self.drawPosition[0] = self.displaySize[0] / 2 - self.levelSize[0] / 2 
+            self.drawPosition[1] = self.displaySize[1] / 2 - self.levelSize[1] / 2 
+        
+        self.drawPosition[0] += self.offsetPosition[0]
+        self.drawPosition[1] += self.offsetPosition[1]
+             
+    def move_entities(self, offsetPosition):
+        for entity in self.entitiesList:
+            entity.physics.move_position(entity, offsetPosition)
     
-    def update_all(self, FPS:int, firstInit:bool=False) -> None:        
+    def move_backgrounds(self, offsetPosition):
+        for background in self.backgroundList:
+            background.physics.move_position(background, offsetPosition)
+    
+    def update_all(self, FPS:int, firstInit:bool=False) -> None:       
         self.update(FPS, firstInit=firstInit)
-        self.mainCharacter.update(FPS=FPS, firstInit=firstInit)
+
+        if self.physics.isPositionChanged:
+            offsetPosition = [self.physics.position[0] - self.physics.previousPosition[0], self.physics.position[1] - self.physics.previousPosition[1]]
+            if self.updateMainCharacter and self.fitMainCharacterPosition:
+                self.mainCharacter.physics.move_position(self.mainCharacter, offsetPosition)
+            self.move_backgrounds(offsetPosition)
+            self.move_entities(offsetPosition)
+            
+
+        if self.mainCharacter is not None:
+            if self.updateMainCharacter:
+                self.mainCharacter.update(FPS=FPS, firstInit=firstInit)
+
         self.update_backgrounds(FPS=FPS, firstInit=firstInit)
         self.update_entities(FPS=FPS, firstInit=firstInit)
         self.update_works_space_position()
-        collide_and_limit(self.mainCharacter, self.entitiesList)
-        
-    
+        if self.mainCharacter is not None:
+            collide_and_limit(self.mainCharacter, self.entitiesList)
+          
     def fitThePosition(self, position:list) -> list:
-        return self.physics.position[0] + position[0], self.physics.position[1] + position[1]
+        return self.drawPosition[0] + position[0], self.drawPosition[1] + position[1]
     
     def listen_keys_all(self, keyPressedList) -> None:
         self.listen_keys(keyPressedList)
-        self.mainCharacter.listen_keys(keyPressedList)
+
+        if self.mainCharacter is not None:
+            if self.updateMainCharacter:
+                self.mainCharacter.listen_keys(keyPressedList)
+
         for background in self.backgroundList:
             background.listen_keys(keyPressedList)
     
     def listen_mouse(self, mousePosition:tuple[int], mouseButtons:tuple[bool]):
         self.mouseListener(self, mousePosition, mouseButtons)
-        isMainCharacterCompared = False
-        mainCharacterClickableSpace = pygame.Rect(self.fitThePosition((self.mainCharacter.get_clickable_space().left, self.mainCharacter.get_clickable_space().top)), self.mainCharacter.get_clickable_space().size)
+        isMainCharacterCompared = not self.updateMainCharacter
+
+        if self.mainCharacter is not None:
+            if self.fitMainCharacterPosition:
+                mainCharacterClickableSpace = pygame.Rect(self.fitThePosition((self.mainCharacter.get_clickable_space().left, self.mainCharacter.get_clickable_space().top)), self.mainCharacter.get_clickable_space().size)
+            else:
+                mainCharacterClickableSpace = self.mainCharacter.get_clickable_space()
         for entity in self.entitiesList[::-1]:
-            if not isMainCharacterCompared and entity.get_max_y_texture_position() < self.mainCharacter.get_max_y_texture_position():
-                if mainCharacterClickableSpace.collidepoint(mousePosition):
-                    self.mainCharacter.listen_mouse(mousePosition, mouseButtons)
-                    break
-                isMainCharacterCompared = True
+            if self.mainCharacter is not None:
+                if not isMainCharacterCompared and entity.get_max_y_texture_position() < self.mainCharacter.get_max_y_texture_position():
+                    if mainCharacterClickableSpace.collidepoint(mousePosition):
+                        self.mainCharacter.listen_mouse(mousePosition, mouseButtons)
+                        break
+                    isMainCharacterCompared = True
             
             entityClickableSpace = pygame.Rect(self.fitThePosition((entity.get_clickable_space().left, entity.get_clickable_space().top)), entity.get_clickable_space().size)
             if entityClickableSpace.collidepoint(mousePosition):
                 entity.listen_mouse(mousePosition, mouseButtons)
                 break
-        if not isMainCharacterCompared:
-            if mainCharacterClickableSpace.collidepoint(mousePosition):
-                self.mainCharacter.listen_mouse(mousePosition, mouseButtons)
-
+        if self.mainCharacter is not None:
+            if not isMainCharacterCompared:
+                if mainCharacterClickableSpace.collidepoint(mousePosition):
+                    self.mainCharacter.listen_mouse(mousePosition, mouseButtons)
 
     def show(self, display:pygame.Surface) -> None:
         display.blit(self.background, (0,0))
@@ -583,47 +672,78 @@ class LevelWorksSpace(Entity):
             debugImage = pygame.Surface(self.levelSize)
             debugImage.set_colorkey((0,0,0))
 
-        if self.showHitboxes:
-            pygame.draw.rect(debugImage, self.mainCharacter.physics.hitboxColor, self.mainCharacter.physics.hitbox, 10)
+        if self.mainCharacter is not None:
+            if self.showHitboxes:
+                if self.fitMainCharacterPosition:
+                    mainCharacterFittedHitbox = pygame.Rect(self.fitThePosition((self.mainCharacter.physics.hitbox.left, self.mainCharacter.physics.hitbox.top)), (self.mainCharacter.physics.hitbox.width, self.mainCharacter.physics.hitbox.height))
+                else:
+                    mainCharacterFittedHitbox = self.mainCharacter.physics.hitbox
+                pygame.draw.rect(debugImage, self.mainCharacter.physics.hitboxColor, mainCharacterFittedHitbox, 10)
 
-        if self.showPositions:
-            pygame.draw.circle(debugImage, self.mainCharacter.physics.positionColor, self.mainCharacter.physics.position, 10)
-        
-        if self.showClickableSpaces:
-            if self.mainCharacter.isClicked:
-                pygame.draw.rect(debugImage, (255,0,0), self.mainCharacter.get_clickable_space(), 5)
-            elif self.mainCharacter.isHover:
-                pygame.draw.rect(debugImage, (255,255,0), self.mainCharacter.get_clickable_space(), 5)
-            else:
-                pygame.draw.rect(debugImage, (0,255,0), self.mainCharacter.get_clickable_space(), 5)
+            if self.showPositions:
+                if self.fitMainCharacterPosition:
+                    mainCharacterFittedPosition = self.fitThePosition(self.mainCharacter.physics.position)
+                else:
+                    mainCharacterFittedPosition = self.mainCharacter.physics.position
+                
+                if 0 <= mainCharacterFittedPosition[0] <= self.displaySize[0] and 0 <= mainCharacterFittedPosition[1] <= self.displaySize[1]:
+                    pygame.draw.circle(debugImage, self.mainCharacter.physics.positionColor, mainCharacterFittedPosition, 10)
+            
+            if self.showClickableSpaces:
+                if self.fitMainCharacterPosition:
+                    mainCharacterFittedClickableSpace = pygame.Rect(self.fitThePosition((self.mainCharacter.get_clickable_space().left, self.mainCharacter.get_clickable_space().top)), (self.mainCharacter.get_clickable_space().width, self.mainCharacter.get_clickable_space().height))
+                else:
+                    mainCharacterFittedClickableSpace = self.mainCharacter.get_clickable_space()
+                if self.mainCharacter.isClicked:
+                    pygame.draw.rect(debugImage, (255,0,0), mainCharacterFittedClickableSpace, 5)
+                elif self.mainCharacter.isHover:
+                    pygame.draw.rect(debugImage, (255,255,0), mainCharacterFittedClickableSpace, 5)
+                else:
+                    pygame.draw.rect(debugImage, (0,255,0), mainCharacterFittedClickableSpace, 5)
 
         for entity in self.entitiesList:
-            if not isMainCharacterShowed and entity.get_max_y_texture_position() > self.mainCharacter.get_max_y_texture_position():
-                display.blit(self.mainCharacter.animation.get_texture(), self.fitThePosition(self.mainCharacter.get_texture_position()))
-                isMainCharacterShowed = True
+            if self.mainCharacter is not None:
+                if not isMainCharacterShowed and entity.get_max_y_texture_position() > self.mainCharacter.get_max_y_texture_position():
+                    if self.fitMainCharacterPosition:
+                        display.blit(self.mainCharacter.animation.get_texture(), self.fitThePosition(self.mainCharacter.get_texture_position()))
+                    else:
+                        display.blit(self.mainCharacter.animation.get_texture(), self.mainCharacter.get_texture_position())
+                    isMainCharacterShowed = True
                     
             display.blit(entity.animation.get_texture(), self.fitThePosition(entity.get_texture_position()))
             if self.showHitboxes:
-                pygame.draw.rect(debugImage, entity.physics.hitboxColor, entity.physics.hitbox, 10)
+                entityFittedHitbox = pygame.Rect(self.fitThePosition((entity.physics.hitbox.left, entity.physics.hitbox.top)), (entity.physics.hitbox.width, entity.physics.hitbox.height))
+                pygame.draw.rect(debugImage, entity.physics.hitboxColor, entityFittedHitbox, 10)
                 
             if self.showPositions:
-                pygame.draw.circle(debugImage, entity.physics.positionColor, entity.physics.position, 10)
+                entityFittedPosition = self.fitThePosition(entity.physics.position)
+                if 0 <= entityFittedPosition[0] <= self.displaySize[0] and 0 <= entityFittedPosition[1] <= self.displaySize[1]:
+                    pygame.draw.circle(debugImage, entity.physics.positionColor, entityFittedPosition, 10)
             
             if self.showClickableSpaces:
+                entityFittedClickableSpace = pygame.Rect(self.fitThePosition((entity.get_clickable_space().left, entity.get_clickable_space().top)), (entity.get_clickable_space().width, entity.get_clickable_space().height))
                 if entity.isClicked:
-                    pygame.draw.rect(debugImage, (255,0,0), entity.get_clickable_space(), 5)
+                    pygame.draw.rect(debugImage, (255,0,0), entityFittedClickableSpace, 5)
                 elif entity.isHover:
-                    pygame.draw.rect(debugImage, (255,255,0), entity.get_clickable_space(), 5)
+                    pygame.draw.rect(debugImage, (255,255,0), entityFittedClickableSpace, 5)
                 else:
-                    pygame.draw.rect(debugImage, (0,255,0), entity.get_clickable_space(), 5)
+                    pygame.draw.rect(debugImage, (0,255,0), entityFittedClickableSpace, 5)
 
-        if not isMainCharacterShowed:
-            display.blit(self.mainCharacter.animation.get_texture(), self.fitThePosition(self.mainCharacter.get_texture_position()))
+        if self.mainCharacter is not None:
+            if not isMainCharacterShowed:
+                display.blit(self.mainCharacter.animation.get_texture(), self.fitThePosition(self.mainCharacter.get_texture_position()))
 
         #pygame.draw.rect(display, (255, 0, 0), (self.fitThePosition(self.mainCharacter.get_texture_position())[0], self.fitThePosition(self.mainCharacter.get_texture_position())[1],self.mainCharacter.animation.get_texture().get_rect().width, self.mainCharacter.animation.get_texture().get_rect().height))
         
         if self.showHitboxes or self.showPositions or self.showClickableSpaces:
-            display.blit(debugImage, self.fitThePosition((0,0)))
+            display.blit(debugImage, (0,0))
         
-    
+class ContextualMenu(LevelWorksSpace):
+    def __init__(self, menuSize: tuple, closeAllMenusBeforeShow:bool, closeOnClickOutside:bool, preventOthersListening:bool, preventOthersUpdates:bool, background: Background | list, displaySize: tuple, entitiesList: Entity | list, entity_id: int | str, physics: list | Physics = Physics([0, 0]), animation=Animation(), eventListeners: dict = debug_level_listeners, backgroundColor: tuple = (0, 0, 255, 0), behaviour: types.FunctionType = lambda selfEntity: None, firstInitFps: int = 60, mouseListener: types.FunctionType = lambda selfEntity, mousePosition, buttons: None) -> None:
+        super().__init__(menuSize, background, None, displaySize, entitiesList, entity_id, physics, animation, Location.LEFT_TOP, eventListeners, backgroundColor, behaviour, firstInitFps, mouseListener, FitThePositionBehaviour.TO_LOCATION)   
+        self.preventOthersListening = preventOthersListening
+        self.preventOthersUpdates = preventOthersUpdates
+        self.closeAllMenusBeforeShow = closeAllMenusBeforeShow
+        self.closeOnClickOutside = closeOnClickOutside
+
  

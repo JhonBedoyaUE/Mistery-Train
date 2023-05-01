@@ -1,6 +1,10 @@
 from game_modules.entities import *
 from game_modules.utilities import *
 
+def move_level(entity:LevelWorksSpace):
+    if entity.time >= 3:
+        entity.physics.velocity = [0, 0]
+
 def chair_negative(self:Entity, entity:Entity) -> None:
     """Es un ejemplo de escuchador del evento de colision o collide listener, el cual cambia los colores de la textura de la silla a negativo. 
 
@@ -116,7 +120,11 @@ def create_level(SIZE:tuple[int]) -> LevelWorksSpace:
             entitiesList.append(Entity(Physics([100 + 100*i, j], margin=[0, -50, 0, 0], isCollidable=True), Animation(textures=ch1Textures, actualTexture='chair1'), collideListeners={"MainCharacter": chair_negative}, entity_id=i+j, mouseListener=example_of_click_event, clickableSpace=ClickableSpace.SPRITE))
 
     # Creando el LevelworksSpace que representa nuestro nivel, con su tamaño, sus fondos, personaje principal, tamaño de la ventana y las entidades a interactuar
-    levelWorksSpace = LevelWorksSpace(levelSize,[bg1, bg2], mainCharacter, SIZE, entitiesList=entitiesList)
+    levelWorksSpace = LevelWorksSpace(levelSize,[bg1, bg2], mainCharacter, SIZE, entitiesList, 'exampleLevel', location=Location.LEFT_TOP, fitThePositionBehaviour=FitThePositionBehaviour.FOLLOW_MAIN_CHARACTER, physics=Physics([0,0], velocity=[0, 0]), behaviour=move_level)
+
+
+    #levelWorksSpace.offsetPosition = [100, 200]
+    #levelWorksSpace.fitMainCharacterPosition = False
 
 
     return levelWorksSpace
