@@ -2,6 +2,9 @@ from game_modules.entities import *
 from game_modules.utilities import *
 
 def text_behaviour(entity:Entity):
+    if len(entity.animation.text) >= 100:
+        entity.animation.text = ""
+        entity.time = 0
     if entity.time >= 1:
         entity.animation.text += '\n'
         entity.time = 0
