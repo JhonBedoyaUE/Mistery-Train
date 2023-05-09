@@ -153,7 +153,7 @@ class Transformation:
             name (str): El nombre de la textura, no es modificado, 
             scalar (float, optional): El factor a reescalar las imagenes. Defaults to 1.
             extractContent (bool, optional): Define si extraer el contenido no transparente de las imagenes. Defaults to False.
-            scalarBase (tuple, optional): Si se define reescala la imagen teniendo en cuenta este tamaño como base. Defaults to (0,0).
+            scalarBase (tuple, optional): Si se define reescala las imagenes teniendo en cuenta este tamaño como base. Defaults to (0,0).
 
         Returns:
             dict: El diccionario con el sprite con trasformaciones basicas y el nombre de la textura sin modificar.
@@ -183,7 +183,7 @@ class Transformation:
             name (str): El nombre de la textura, si se invierte se retorna con el prefijo  'xflip_', 
             scalar (float, optional): El factor a reescalar las imagenes. Defaults to 1.
             extractContent (bool, optional): Define si extraer el contenido no transparente de las imagenes. Defaults to False.
-            scalarBase (tuple, optional): Si se define reescala la imagen teniendo en cuenta este tamaño como base. Defaults to (0,0).
+            scalarBase (tuple, optional): Si se define reescala las imagenes teniendo en cuenta este tamaño como base. Defaults to (0,0).
 
         Returns:
             dict: El diccionario con el sprite transformado y el nombre de la textura, que si es invertida tendra el subfijo 'xflip_'.
@@ -212,7 +212,7 @@ class Transformation:
             name (str): El nombre de la textura, si se invierte se retorna con el prefijo  'negative_', 
             scalar (float, optional): El factor a reescalar las imagenes. Defaults to 1.
             extractContent (bool, optional): Define si extraer el contenido no transparente de las imagenes. Defaults to False.
-            scalarBase (tuple, optional): Si se define reescala la imagen teniendo en cuenta este tamaño como base. Defaults to (0,0).
+            scalarBase (tuple, optional): Si se define reescala las imagenes teniendo en cuenta este tamaño como base. Defaults to (0,0).
 
         Returns:
             dict: El diccionario con el sprite transformado y el nombre de la textura, que si es invertida tendra el subfijo 'negative_'.
@@ -241,7 +241,7 @@ class Transformation:
             name (str): El nombre de la textura, si se invierte se retorna con el prefijo  f'{90*variationIndex}rotated_', 
             scalar (float, optional): El factor a reescalar las imagenes. Defaults to 1.
             extractContent (bool, optional): Define si extraer el contenido no transparente de las imagenes. Defaults to False.
-            scalarBase (tuple, optional): Si se define reescala la imagen teniendo en cuenta este tamaño como base. Defaults to (0,0).
+            scalarBase (tuple, optional): Si se define reescala las imagenes teniendo en cuenta este tamaño como base. Defaults to (0,0).
 
         Returns:
             dict: El diccionario con el sprite transformado y el nombre de la textura, que si es rotada tendra el subfijo f'{90*variationIndex}rotated_'.
@@ -262,7 +262,23 @@ class Transformation:
 
 
         
-def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/', variations:int|tuple[int]=1, transformFunctions:types.FunctionType|tuple[types.FunctionType]=Transformation.BASIC, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+def create_textures(fileNameList:list[str], spriteLeghtList:list[int], path:str='textures/', variations:int|tuple[int]=1, transformFunctions:types.FunctionType|tuple[types.FunctionType]=Transformation.BASIC, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict[str, Texture]:
+    """Carga las imagenes y crea las texturas correspondientes a cada imagen transformadas segun las funciones de transformacion, y retorna las texturas en un diccionario donde cada llave es el nombre que le corresponde, el cual es la primera parte del nombre del archivo antes del punto junto con el prefijo correspondiente si son trasformadas.
+
+    Args:
+        fileNameList (list[str]): Lista de los nombres de las imagenes a cargar.
+        spriteLeghtList (list[int]): Lista de la cantidad de de Fotogramas que contiene cada imagen.
+        path (str, optional): Es la ruta de la carpeta donde se encuentran las imagenes. Defaults to 'textures/'.
+        variations (int, optional): Lista de la cantidad de variaciones de cada imagen para cada funcion de tranformacion. Defaults to 1.
+        transformFunctions (types.FunctionType, optional): Lista de las funciones de tranformacion a aplicar a cada una de las imagenes. Defaults to Transformation.BASIC.
+        scalar (float, optional): El factor a reescalar las imagenes. Defaults to 1.
+        extractContent (bool, optional): Define si extraer el contenido no transparente de las imagenes. Defaults to False.
+        scalarBase (tuple, optional): Si se define reescala las imagenes teniendo en cuenta este tamaño como base. Defaults to (0,0).
+
+    Returns:
+        dict[str, Texture]: El diccionario con todas las texturas creadas y transformadas a base de las imagenes cargadas, donde su llave es el nombre correspondiente (subfijo+nombre_antes_del_punto)
+    """
+
     textures = {'default': Texture(pygame.Surface((500, 500), pygame.SRCALPHA), 1)}
     for index in range(len(fileNameList)):
         sprite = pygame.image.load(path + fileNameList[index]).convert_alpha()
@@ -285,13 +301,27 @@ def create_textures(fileNameList:list, spriteLeghtList:list, path:str='textures/
 
     return textures
 
-def create_empty_texture(width:int, height:int, name:str='default', scalar:float=1, scalarBase:tuple=(0,0)):
+def create_empty_texture(width:int, height:int, name:str='default', scalar:float=1, scalarBase:tuple[int, int]=(0,0)) -> dict[str, Texture]:
+    """Retorna un diccionario con una textura con una sola imagen transparente con el tamaño indicado.
+
+    Args:
+        width (int): Ancho de la imagen de la textura.
+        height (int): Alto de la imagen de la textura.
+        name (str, optional): Nombre de la textura. Defaults to 'default'.
+        scalar (float, optional): El factor a reescalar la imagen. Defaults to 1.
+        scalarBase (tuple[int, int], optional): Si se define reescala la imagen teniendo en cuenta este tamaño como base. Defaults to (0,0).
+
+    Returns:
+        dict[str, Texture]: El diccionario la textura de imagen transparente creada y transformada, donde su llave es el valor de name.
+    """
+
     emptySprite = pygame.Surface((width, height), pygame.SRCALPHA)
     emptySprite.set_alpha(0)
     textureVariation = Transformation.BASIC(Texture(emptySprite, 1), None, name, scalar=scalar, scalarBase=scalarBase)
     return {name: textureVariation['sprite']}
 
-def create_text_texture(text:str, textColor:tuple[int, int, int, int], font:pygame.font.Font, name:str='default', scalar:float=1, scalarBase:tuple=(0,0)):
+def create_text_texture(text:str, textColor:tuple[int, int, int, int], font:pygame.font.Font, name:str='default', scalar:float=1, scalarBase:tuple=(0,0)) -> dict[str, Texture]:
+    
     textLines = text.split('\n')
     renderedTextLines = [font.render(line, True, textColor) for line in textLines]
 

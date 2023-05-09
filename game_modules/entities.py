@@ -31,6 +31,7 @@ class Entity:
         self.mouseListener = mouseListener
         self.clickableSpace = clickableSpace
         self.isClicked = False
+        self.isRightClicked = False
         self.isHover = False
         self.globals = {}
     
@@ -45,6 +46,8 @@ class Entity:
         self.mouseListener(self, mousePosition, mouseButtons)
         if mouseButtons[0]:
             self.isClicked = True
+        elif mouseButtons[2]:
+            self.isRightClicked = True
     
     def listen_collide(self, collidedEntity):
         if collidedEntity.type in self.collideListeners.keys():
@@ -68,6 +71,7 @@ class Entity:
         self.physics.update_hitbox(pygame.Rect(self.get_texture_position(), self.animation.get_texture().get_size()))
         self.isClicked = False
         self.isHover = False
+        self.isRightClicked = False
     
     def get_texture_position(self) -> list:
         """AI is creating summary for get_texture_position
@@ -696,6 +700,8 @@ class LevelWorksSpace(Entity):
                     mainCharacterFittedClickableSpace = self.mainCharacter.get_clickable_space()
                 if self.mainCharacter.isClicked:
                     pygame.draw.rect(debugImage, (255,0,0), mainCharacterFittedClickableSpace, 5)
+                elif self.mainCharacter.isRightClicked:
+                    pygame.draw.rect(debugImage, (255,0,255), mainCharacterFittedClickableSpace, 5)
                 elif self.mainCharacter.isHover:
                     pygame.draw.rect(debugImage, (255,255,0), mainCharacterFittedClickableSpace, 5)
                 else:
@@ -724,6 +730,8 @@ class LevelWorksSpace(Entity):
                 entityFittedClickableSpace = pygame.Rect(self.fitThePosition((entity.get_clickable_space().left, entity.get_clickable_space().top)), (entity.get_clickable_space().width, entity.get_clickable_space().height))
                 if entity.isClicked:
                     pygame.draw.rect(debugImage, (255,0,0), entityFittedClickableSpace, 5)
+                elif entity.isRightClicked:
+                    pygame.draw.rect(debugImage, (255,0,255), entityFittedClickableSpace, 5)
                 elif entity.isHover:
                     pygame.draw.rect(debugImage, (255,255,0), entityFittedClickableSpace, 5)
                 else:
