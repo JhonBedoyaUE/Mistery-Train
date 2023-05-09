@@ -48,10 +48,18 @@ class AnimationIterationBehavior(Enum):
     CUSTOM = 0
     ONCE = 1
 
-# La siguiente parte 
+# La siguiente parte corresponde a la carga, procesado y almacenamiento de las imagenes utilizadas en las entidades del juego, permitiendo trabajar con los fotogramas de las animaciones
 
 class Texture:
-    def __init__(self, sprite:list[pygame.Surface], lenght:int=-1, size:tuple[int, int] = [0, 0]) -> None:
+    """Procesa y almacena las imagenes en forma de fotogramas agrupadas en sprites."""
+    def __init__(self, sprite:list[pygame.Surface]|pygame.Surface, lenght:int=-1, size:tuple[int, int] = [0, 0]) -> None:
+        """Si no se especifica el lenght (cantidad|longitud), se debe dar una lista de imagenes en sprite guardarlas como fotogramas.Si se especifica el lenght se debe dar una imagen (pygame.Surface) para transformala y dividirla en partes iguales horizontalmente.
+
+        Args:
+            sprite (list[pygame.Surface]): lista de imagenes o imagen a dividir, que se almacenara.
+            lenght (int, optional): (Si se especifica) Es la cantidad de fotogramas que contiene horizontalmente. Defaults to -1.
+            size (tuple[int, int], optional): No especificar, su uso es de depuracion. Defaults to [0, 0].
+        """
         if lenght >= 0:
             self.lenght = lenght
             self.sprite = []
@@ -67,6 +75,14 @@ class Texture:
                 self.size = size
 
 def find_content(surface:pygame.Surface) -> pygame.Rect:
+    """Retorna un rectangulo que abarca la region que no es transparente en la imagen.
+
+    Args:
+        surface (pygame.Surface): La imagen donde se buscara el la region que no es transparente.
+
+    Returns:
+        pygame.Rect: El rectangulo que abarca la region que no es transparente.
+    """
     minX = surface.get_width()
     maxX = 0
     minY = surface.get_height()
@@ -85,13 +101,31 @@ def find_content(surface:pygame.Surface) -> pygame.Rect:
                     maxY = y
     return pygame.Rect(minX, minY, maxX - minX, maxY - minY)
 
-def extract_content(surface:pygame.Surface, extract) -> pygame.Rect:
+def extract_content(surface:pygame.Surface, extract:bool) -> pygame.Rect:
+    """Si extract es True recorta y retorna la region de la imagen que no es transparente.
+
+    Args:
+        surface (pygame.Surface): La imagen a extraer el contenido.
+        extract (bool): si es True extrae el contenido, si es False retorna la imagen sin modificarla.
+
+    Returns:
+        pygame.Rect: La imagen con el contenido extraido o la misma que se paso como surface.
+    """
     if extract:
         return surface.subsurface(find_content(surface))
     else:
         return surface
 
 def invert_colors(surface:pygame.Surface, invert:bool) -> pygame.Rect:
+    """Si invert es True invierte los colores de la imagen.
+
+    Args:
+        surface (pygame.Surface): La imagen a invertir los colores.
+        invert (bool): si es True invierte los colores, si es False retorna la imagen sin modificarla.
+
+    Returns:
+        pygame.Rect: La imagen con los colores invertidos o la misma que se paso como surface.
+    """
     if invert:
         invertedSurface = surface.copy()
         for x in range(surface.get_width()):
@@ -105,6 +139,9 @@ def invert_colors(surface:pygame.Surface, invert:bool) -> pygame.Rect:
 
 
 class Transformation:
+    """Contiene las funciones necesarias para transformar las imagenes, donde cada una puede reescalar y ectraer el contenido de imagen y define el nombre de la resultante."""
+    
+    @staticmethod
     def BASIC(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
         scalledSprite = [] 
         for frame in sprite.sprite:
@@ -120,6 +157,7 @@ class Transformation:
             scalledSprite.append(extract_content(pygame.transform.scale_by(frame, textureScalar), extractContent))
         return {'sprite': Texture(scalledSprite), 'name': name}
 
+    @staticmethod
     def XFLIP(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
         flippedSprite = []
         for frame in sprite.sprite:
@@ -134,7 +172,7 @@ class Transformation:
             flippedSprite.append(extract_content(pygame.transform.scale_by(pygame.transform.flip(frame, flip_x=(variationIndex != 0), flip_y=False), textureScalar), extractContent))
         return {'sprite': Texture(flippedSprite), 'name': ('xflip_'*(variationIndex != 0))+name}
     
-    
+    @staticmethod
     def NEGATIVE_COLOR(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
         negativeSprite = []
         for frame in sprite.sprite:
@@ -149,6 +187,7 @@ class Transformation:
             negativeSprite.append(invert_colors(extract_content(pygame.transform.scale_by(frame, textureScalar), extractContent), (variationIndex != 0)))
         return {'sprite': Texture(negativeSprite), 'name': ('negative_'*(variationIndex != 0))+name}
     
+    @staticmethod
     def RECT_ROTATION(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
         flippedSprite = []
         for frame in sprite.sprite:
