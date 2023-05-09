@@ -51,7 +51,7 @@ class AnimationIterationBehavior(Enum):
 # La siguiente parte corresponde a la carga, procesado y almacenamiento de las imagenes utilizadas en las entidades del juego, permitiendo trabajar con los fotogramas de las animaciones
 
 class Texture:
-    """Procesa y almacena las imagenes en forma de fotogramas agrupadas en sprites."""
+    """Procesa y almacena las imagenes en forma de fotogramas agrupadas de los sprites como textura de las entidades."""
     def __init__(self, sprite:list[pygame.Surface]|pygame.Surface, lenght:int=-1, size:tuple[int, int] = [0, 0]) -> None:
         """Si no se especifica el lenght (cantidad|longitud), se debe dar una lista de imagenes en sprite guardarlas como fotogramas.Si se especifica el lenght se debe dar una imagen (pygame.Surface) para transformala y dividirla en partes iguales horizontalmente.
 
@@ -142,7 +142,21 @@ class Transformation:
     """Contiene las funciones necesarias para transformar las imagenes, donde cada una puede reescalar y ectraer el contenido de imagen y define el nombre de la resultante."""
     
     @staticmethod
-    def BASIC(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+    def BASIC(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict[str, Texture|str]:
+        """Retorna las imagenes en la textura con las transformaciones basicas como reescalar o extraer el contenido. 
+
+        Args:
+            sprite (Texture): La textura con las imagenes a transformar.
+            variationIndex (int): Es ignorado, esta por compatibilidad en la creacion de texturas.
+            name (str): El nombre de la textura, no es modificado, 
+            scalar (float, optional): El factor a reescalar las imagenes. Defaults to 1.
+            extractContent (bool, optional): Define si extraer el contenido no transparente de las imagenes. Defaults to False.
+            scalarBase (tuple, optional): Si se define reescala la imagen teniendo en cuenta este tamaño como base. Defaults to (0,0).
+
+        Returns:
+            dict: El diccionario con el sprite con trasformaciones basicas y el nombre de la textura sin modificar.
+        """
+
         scalledSprite = [] 
         for frame in sprite.sprite:
             textureScalar = scalar
@@ -159,6 +173,20 @@ class Transformation:
 
     @staticmethod
     def XFLIP(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+        """Ademas de las transformaciones basicas, puede retornar las imagenes de la textura invertidas horizontalmente y modificar su nombre con el prefijo 'xflip_'. 
+
+        Args:
+            sprite (Texture): La textura con las imagenes a transformar.
+            variationIndex (int): Si es distinto a cero invierte las imagenes horizontalmente.
+            name (str): El nombre de la textura, si se invierte se retorna con el prefijo  'xflip_', 
+            scalar (float, optional): El factor a reescalar las imagenes. Defaults to 1.
+            extractContent (bool, optional): Define si extraer el contenido no transparente de las imagenes. Defaults to False.
+            scalarBase (tuple, optional): Si se define reescala la imagen teniendo en cuenta este tamaño como base. Defaults to (0,0).
+
+        Returns:
+            dict: El diccionario con el sprite transformado y el nombre de la textura, que si es invertida tendra el subfijo 'xflip_'.
+        """
+
         flippedSprite = []
         for frame in sprite.sprite:
             textureScalar = scalar
@@ -174,6 +202,20 @@ class Transformation:
     
     @staticmethod
     def NEGATIVE_COLOR(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+        """Ademas de las transformaciones basicas, puede retornar las imagenes de la textura con los colores invertidos y modificar su nombre con el prefijo 'negative_'. 
+
+        Args:
+            sprite (Texture): La textura con las imagenes a transformar.
+            variationIndex (int): Si es distinto a cero invierte los colores de las imagenes.
+            name (str): El nombre de la textura, si se invierte se retorna con el prefijo  'negative_', 
+            scalar (float, optional): El factor a reescalar las imagenes. Defaults to 1.
+            extractContent (bool, optional): Define si extraer el contenido no transparente de las imagenes. Defaults to False.
+            scalarBase (tuple, optional): Si se define reescala la imagen teniendo en cuenta este tamaño como base. Defaults to (0,0).
+
+        Returns:
+            dict: El diccionario con el sprite transformado y el nombre de la textura, que si es invertida tendra el subfijo 'negative_'.
+        """
+
         negativeSprite = []
         for frame in sprite.sprite:
             textureScalar = scalar
@@ -189,6 +231,20 @@ class Transformation:
     
     @staticmethod
     def RECT_ROTATION(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+        """Ademas de las transformaciones basicas, puede retornar las imagenes de la textura rotadas con angulos rectos y modificar su nombre con el prefijo f'{90*variationIndex}rotated_'. 
+
+        Args:
+            sprite (Texture): La textura con las imagenes a transformar.
+            variationIndex (int): Si es distinto a cero rota las imagenes, el agulo de rotacion es la multiplicacion de variationIndex por 90.
+            name (str): El nombre de la textura, si se invierte se retorna con el prefijo  f'{90*variationIndex}rotated_', 
+            scalar (float, optional): El factor a reescalar las imagenes. Defaults to 1.
+            extractContent (bool, optional): Define si extraer el contenido no transparente de las imagenes. Defaults to False.
+            scalarBase (tuple, optional): Si se define reescala la imagen teniendo en cuenta este tamaño como base. Defaults to (0,0).
+
+        Returns:
+            dict: El diccionario con el sprite transformado y el nombre de la textura, que si es rotada tendra el subfijo f'{90*variationIndex}rotated_'.
+        """
+
         flippedSprite = []
         for frame in sprite.sprite:
             textureScalar = scalar
