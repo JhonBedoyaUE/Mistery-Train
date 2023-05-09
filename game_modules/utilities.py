@@ -2,6 +2,8 @@ import pygame, types
 from math import floor
 from enum import Enum
 
+# En la definicion de las funciones se utilizo typeHint que permite informar cual es el tipo de los parametros y del retorno de la funcion
+# Para más onformación sobre typeHinto visita https://docs.python.org/3/library/typing.html 
 # Las siguientes clases son Enumeraciones (Enum) que permiten darle orden y entendimiento a las diversas comparaciones y asignaciones que se hacen en el codigo
 # Para más información sobre los Enums visita https://docs.python.org/es/3/library/enum.html
 
@@ -172,7 +174,7 @@ class Transformation:
         return {'sprite': Texture(scalledSprite), 'name': name}
 
     @staticmethod
-    def XFLIP(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+    def XFLIP(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict[str, Texture|str]:
         """Ademas de las transformaciones basicas, puede retornar las imagenes de la textura invertidas horizontalmente y modificar su nombre con el prefijo 'xflip_'. 
 
         Args:
@@ -201,7 +203,7 @@ class Transformation:
         return {'sprite': Texture(flippedSprite), 'name': ('xflip_'*(variationIndex != 0))+name}
     
     @staticmethod
-    def NEGATIVE_COLOR(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+    def NEGATIVE_COLOR(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict[str, Texture|str]:
         """Ademas de las transformaciones basicas, puede retornar las imagenes de la textura con los colores invertidos y modificar su nombre con el prefijo 'negative_'. 
 
         Args:
@@ -230,7 +232,7 @@ class Transformation:
         return {'sprite': Texture(negativeSprite), 'name': ('negative_'*(variationIndex != 0))+name}
     
     @staticmethod
-    def RECT_ROTATION(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict:
+    def RECT_ROTATION(sprite:Texture, variationIndex:int, name:str, scalar:float=1, extractContent:bool=False, scalarBase:tuple=(0,0)) -> dict[str, Texture|str]:
         """Ademas de las transformaciones basicas, puede retornar las imagenes de la textura rotadas con angulos rectos y modificar su nombre con el prefijo f'{90*variationIndex}rotated_'. 
 
         Args:
