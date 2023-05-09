@@ -1,22 +1,29 @@
-import pygame, types, math
+import pygame, types
+from math import floor
+from enum import Enum
 
+# Las siguientes clases son Enumeraciones (Enum) que permiten darle orden y entendimiento a las diversas comparaciones y asignaciones que se hacen en el codigo
+# Para más información sobre los Enums visita https://docs.python.org/es/3/library/enum.html
 
-
-class FitThePositionBehaviour:
+class FitThePositionBehaviour(Enum):
+    """Usado en la clase LevelWorksSpace para definir el comportamiento de la vista del nivel."""
     FOLLOW_MAIN_CHARACTER = 0
     TO_LOCATION = 1
 
-class ClickableSpace:
+class ClickableSpace(Enum):
+    """Usado en la clase Entity para definir el area en que se le puede dar click a una entidad."""
     SPRITE = 0
     HITBOX = 1
 
-class Direction:
+class Direction(Enum):
+    """Usado para tener en cuenta la direccion que toma el personaje al caminar."""
     LEFT = 0
     UP = 1
     RIGHT = 2
     DOWN = 3
 
-class Location:
+class Location(Enum):
+    """Usado para darle una posicion relativa a distintos objetos en relacion a otros objetos."""
     LEFT_TOP = 0
     CENTER_TOP = 1
     RIGHT_TOP = 2
@@ -28,23 +35,27 @@ class Location:
     CENTER = 8
     CUSTOM = 9
 
-class AnimationDirection:
+class AnimationDirection(Enum):
+    """Usado en la clase Animation para definir el comportamiento de repeticion de una animacion (como en CSS y HTML)."""
     NORMAL = 0
     REVERSE = 1
     ALTERNATE = 2
     ALTERNATE_REVERSE = 3
 
-class AnimationIterationBehavior:
+class AnimationIterationBehavior(Enum):
+    """Usado para la clase Animation para definir la veces en que se repite una animacion."""
     INFINITE = -1
     CUSTOM = 0
     ONCE = 1
+
+# La siguiente parte 
 
 class Texture:
     def __init__(self, sprite:list[pygame.Surface], lenght:int=-1, size:tuple[int, int] = [0, 0]) -> None:
         if lenght >= 0:
             self.lenght = lenght
             self.sprite = []
-            self.size = [math.floor(sprite.get_rect().width / lenght), sprite.get_rect().height]
+            self.size = [floor(sprite.get_rect().width / lenght), sprite.get_rect().height]
             for i in range(lenght):
                 self.sprite.append(sprite.subsurface((self.size[0] * i, 0, self.size[0], self.size[1])))
         else:
@@ -249,7 +260,7 @@ def create_hitbox(dimentions:pygame.Rect, margin:list, hitboxSize:list[int], hit
             else:
                 newLeft, newTop, newWidth, newHeigth = left+dimentions.left + dimentions.width / 2 - hitboxSize[0] / 2, right+dimentions.top + dimentions.height / 2 - hitboxSize[1] / 2, hitboxSize[0], hitboxSize[1]
         
-        #print(dimentions.left, dimentions.top,newLeft, newTop, newWidth, newHeigth)
+        
         if actualHitbox is not None:
             if previousPosition[0] == actualPosition[0] and actualHitbox.width == newWidth:
                 newLeft = actualHitbox.left
@@ -277,7 +288,7 @@ class Animation:
         if self.isAnimated:
             time = 1 / FPS
             self.animationTime += time
-            self.frame = math.floor(self.animationTime * self.FPS) + self.startFrame
+            self.frame = floor(self.animationTime * self.FPS) + self.startFrame
             self.limit_frame() 
     
     def get_frame_limit(self) -> int:
@@ -334,7 +345,7 @@ class IconAnimation(Animation):
         if self.isAnimated:
             time = 1 / FPS
             self.animationTime += time
-            self.frame = math.floor(self.animationTime * self.FPS) + self.startFrame
+            self.frame = floor(self.animationTime * self.FPS) + self.startFrame
             self.limit_frame() 
             if self.background is not None:
                 self.background.update_frame(FPS)
@@ -365,7 +376,7 @@ class TextIconAnimation(IconAnimation):
         if self.isAnimated:
             time = 1 / FPS
             self.animationTime += time
-            self.frame = math.floor(self.animationTime * self.FPS) + self.startFrame 
+            self.frame = floor(self.animationTime * self.FPS) + self.startFrame 
             self.limit_frame()
 
             if self.text != self.previousText or self.font != self.previousFont or self.textColor != self.previousTextColor:

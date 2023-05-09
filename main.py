@@ -9,5 +9,5 @@ from game_modules.game import GameManager
 # Aún falta terminar textos o menus contextuales
 # La hitbox falla cuando tocas el limite izquierdo y cuando el nivel cambia de posicion, utiliza las transiciones con cuidado
 
-game = GameManager()
+game = GameManager(FPS=60)
 game.start_game()
