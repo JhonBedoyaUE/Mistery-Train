@@ -1,6 +1,7 @@
 from game_modules.game import GameManager
 
-#Importante: Para no saturar el archivo principal:
+# Importante: Utilizar una version reciente de python, superior a 3.5
+# Importante: Para no saturar el archivo principal:
 # La administracion del juego debe realizarse en el archivo /game_modules/game.py
 # El juego se inicia llamando la funcion start_game del modulo game_modules.game que representa el archivo /game_modules/game.py 
 # Los niveles deben crearse como archivos .py en la carpeta /levels
@@ -10,4 +11,5 @@ from game_modules.game import GameManager
 # La hitbox falla cuando tocas el limite izquierdo y cuando el nivel cambia de posicion, utiliza las transiciones con cuidado
 
 game = GameManager(FPS=60)
+
 game.start_game()
